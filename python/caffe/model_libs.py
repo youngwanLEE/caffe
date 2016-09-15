@@ -776,3 +776,468 @@ def CreateMultiBoxHead(net, data_layer="data", num_classes=[], from_layers=[],
         mbox_layers.append(net[name])
 
     return mbox_layers
+
+
+#ResNet50Layer use bias in conv1 and freezed
+def ConvBNLayerWithBias(net, from_layer, out_layer, use_bn, use_relu, num_output,
+    kernel_size, pad, stride, use_scale=True, eps=0.001, conv_prefix='', conv_postfix='',
+    bn_prefix='', bn_postfix='_bn', scale_prefix='', scale_postfix='_scale',
+    bias_prefix='', bias_postfix='_bias'):
+  if use_bn:
+    # parameters for convolution layer with batchnorm.
+    kwargs = { #freezed[LYW]
+        'param': [dict(lr_mult=0, decay_mult=0),dict(lr_mult=0, decay_mult=0)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        #'bias_term': True,
+        'bias_filler': dict(type='constant', value=0),
+        }
+    # parameters for batchnorm layer.
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': eps,
+        }
+    # parameters for scale bias layer after batchnorm.
+    if use_scale:
+      sb_kwargs = {
+          'bias_term': True,
+          'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+          'filler': dict(type='constant', value=1.0),
+          'bias_filler': dict(type='constant', value=0.0),
+          }
+    else:
+      bias_kwargs = {
+          'param': [dict(lr_mult=1, decay_mult=0)],
+          'filler': dict(type='constant', value=0.0),
+          }
+  else:
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1), dict(lr_mult=2, decay_mult=0)],
+        'weight_filler': dict(type='xavier'),
+        'bias_filler': dict(type='constant', value=0)
+        }
+
+  conv_name = '{}{}{}'.format(conv_prefix, out_layer, conv_postfix)
+  [kernel_h, kernel_w] = UnpackVariable(kernel_size, 2)
+  [pad_h, pad_w] = UnpackVariable(pad, 2)
+  [stride_h, stride_w] = UnpackVariable(stride, 2)
+  if kernel_h == kernel_w:
+    net[conv_name] = L.Convolution(net[from_layer], num_output=num_output,
+        kernel_size=kernel_h, pad=pad_h, stride=stride_h, **kwargs)
+  else:
+    net[conv_name] = L.Convolution(net[from_layer], num_output=num_output,
+        kernel_h=kernel_h, kernel_w=kernel_w, pad_h=pad_h, pad_w=pad_w,
+        stride_h=stride_h, stride_w=stride_w, **kwargs)
+  if use_bn:
+    bn_name = '{}{}{}'.format(bn_prefix, out_layer, bn_postfix)
+    net[bn_name] = L.BatchNorm(net[conv_name], in_place=True, **bn_kwargs)
+    if use_scale:
+      sb_name = '{}{}{}'.format(scale_prefix, out_layer, scale_postfix)
+      net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    else:
+      bias_name = '{}{}{}'.format(bias_prefix, out_layer, bias_postfix)
+      net[bias_name] = L.Bias(net[bn_name], in_place=True, **bias_kwargs)
+  if use_relu:
+    relu_name = '{}_relu'.format(conv_name)
+    net[relu_name] = L.ReLU(net[conv_name], in_place=True)    
+
+# Freezed ResNet in Jun_16_2016 by youngwan
+def ConvBNLayerFreeze(net, from_layer, out_layer, use_bn, use_relu, num_output,
+    kernel_size, pad, stride, use_scale=True, eps=0.001, conv_prefix='', conv_postfix='',
+    bn_prefix='', bn_postfix='_bn', scale_prefix='', scale_postfix='_scale',
+    bias_prefix='', bias_postfix='_bias',Freeze=True):
+  if use_bn:
+    # parameters for convolution layer with batchnorm.
+    kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    # parameters for batchnorm layer.
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': eps,
+        }
+    # parameters for scale bias layer after batchnorm.
+    if use_scale:
+      sb_kwargs = {
+          'bias_term': True,
+          'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+          'filler': dict(type='constant', value=1.0),
+          'bias_filler': dict(type='constant', value=0.0),
+          }
+    else:
+      bias_kwargs = {
+          'param': [dict(lr_mult=0, decay_mult=0)],
+          'filler': dict(type='constant', value=0.0),
+          }
+  else:
+    kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'weight_filler': dict(type='xavier'),
+        'bias_filler': dict(type='constant', value=0)
+        }
+
+  conv_name = '{}{}{}'.format(conv_prefix, out_layer, conv_postfix)
+  [kernel_h, kernel_w] = UnpackVariable(kernel_size, 2)
+  [pad_h, pad_w] = UnpackVariable(pad, 2)
+  [stride_h, stride_w] = UnpackVariable(stride, 2)
+  if kernel_h == kernel_w:
+    net[conv_name] = L.Convolution(net[from_layer], num_output=num_output,
+        kernel_size=kernel_h, pad=pad_h, stride=stride_h, **kwargs)
+  else:
+    net[conv_name] = L.Convolution(net[from_layer], num_output=num_output,
+        kernel_h=kernel_h, kernel_w=kernel_w, pad_h=pad_h, pad_w=pad_w,
+        stride_h=stride_h, stride_w=stride_w, **kwargs)
+  if use_bn:
+    bn_name = '{}{}{}'.format(bn_prefix, out_layer, bn_postfix)
+    net[bn_name] = L.BatchNorm(net[conv_name], in_place=True, **bn_kwargs)
+    if use_scale:
+      sb_name = '{}{}{}'.format(scale_prefix, out_layer, scale_postfix)
+      net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    else:
+      bias_name = '{}{}{}'.format(bias_prefix, out_layer, bias_postfix)
+      net[bias_name] = L.Bias(net[bn_name], in_place=True, **bias_kwargs)
+  if use_relu:
+    relu_name = '{}_relu'.format(conv_name)
+    net[relu_name] = L.ReLU(net[conv_name], in_place=True)
+
+def CreateAnnotatedDataLayerLEVELDB(source, batch_size=100, backend=P.Data.LEVELDB,
+        output_label=True, train=True,
+        transform_param={}):
+    if train:
+        kwargs = {
+                'include': dict(phase=caffe_pb2.Phase.Value('TRAIN')),
+                'transform_param': transform_param,
+                }
+    else:
+        kwargs = {
+                'include': dict(phase=caffe_pb2.Phase.Value('TEST')),
+                'transform_param': transform_param,
+                }
+    if output_label:
+        data, label = L.Data(name="data",
+            data_param=dict(batch_size=batch_size, backend=backend, source=source),
+            ntop=2, **kwargs)
+        return [data, label]
+    else:
+        data = L.Data(name="data",
+            data_param=dict(batch_size=batch_size, backend=backend, source=source),
+            ntop=1, **kwargs)
+        return data
+
+# Freezed ResNet in Jun_16_2016 by youngwan
+def ResBodyFreeze(net, from_layer, block_name, out2a, out2b, out2c, stride, use_branch1,Freeze=True):
+  # ResBody(net, 'pool1', '2a', 64, 64, 256, 1, True)
+
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    ConvBNLayerFreeze(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out2c, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch2a'
+  ConvBNLayerFreeze(net, from_layer, branch_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  out_name = '{}{}'.format(conv_prefix, branch_name)
+
+  branch_name = 'branch2b'
+  ConvBNLayerFreeze(net, out_name, branch_name, use_bn=True, use_relu=True,
+      num_output=out2b, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  out_name = '{}{}'.format(conv_prefix, branch_name)
+
+  branch_name = 'branch2c'
+  ConvBNLayerFreeze(net, out_name, branch_name, use_bn=True, use_relu=False,
+      num_output=out2c, kernel_size=1, pad=0, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, branch_name)
+
+  res_name = 'res{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[branch2]) #layer saved!
+  relu_name = '{}_relu'.format(res_name)
+  net[relu_name] = L.ReLU(net[res_name], in_place=True)
+
+
+def ResBasic333Body(net, from_layer, block_name, out2a, out2b, out2c, stride, use_branch1):
+  # ResBody(net, 'pool1', '2a', 64, 64, 256, 1, True)
+
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    ConvBNLayer(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out2c, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch2a'
+  ConvBNLayer(net, from_layer, branch_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=3, pad=1, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  out_name = '{}{}'.format(conv_prefix, branch_name)
+
+  branch_name = 'branch2b'
+  ConvBNLayer(net, out_name, branch_name, use_bn=True, use_relu=True,
+      num_output=out2b, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  out_name = '{}{}'.format(conv_prefix, branch_name)
+
+  branch_name = 'branch2c'
+  ConvBNLayer(net, out_name, branch_name, use_bn=True, use_relu=False,
+      num_output=out2c, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, branch_name)
+
+  res_name = 'res{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[branch2]) #layer saved!
+  relu_name = '{}_relu'.format(res_name)
+  net[relu_name] = L.ReLU(net[res_name], in_place=True)
+
+
+## for CIFAR-10 by LYW : ResNet 19 Layers with only conv 3x3 in 12th_Sep_2016
+
+def ResNet19_Conv3x3_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayerWithBias(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300 --> 150
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+    #net.pool1 = L.Pooling(net.conv1, pool=P.Pooling.MAX, kernel_size=2, stride=2) # 150 --> 75 : in July 5th 2016 by LYW
+
+    from_layer = 'conv1_relu'
+    ResBasic333Body(net, from_layer, '2a', out2a=64, out2b=64, out2c=256, stride=1, use_branch1=True) # 75
+    ResBasic333Body(net, 'res2a', '2b', out2a=64, out2b=64, out2c=256, stride=1, use_branch1=False)
+
+    ResBasic333Body(net, 'res2b', '3a', out2a=128, out2b=128, out2c=512, stride=2, use_branch1=True) # 75 --> 38
+    ResBasic333Body(net, 'res3a', '3d', out2a=128, out2b=128, out2c=512, stride=1, use_branch1=False) # 38
+
+    from_layer = 'res3d'
+    ResBasic333Body(net, from_layer, '4a', out2a=256, out2b=256, out2c=1024, stride=2, use_branch1=True) # 38 --> 19 : stride = 2    
+    ResBasic333Body(net, 'res4a', '4b', out2a=256, out2b=256, out2c=1024, stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## for CIFAR-10 by LYW : ResNet 19 Layers with only conv 3x3 in 14th_Sep_2016
+
+def ResNet19_Conv3x3_l2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayerWithBias(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300 --> 150
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+    #net.pool1 = L.Pooling(net.conv1, pool=P.Pooling.MAX, kernel_size=2, stride=2) # 150 --> 75 : in July 5th 2016 by LYW
+
+    # use_branch1 means that projection shortcut is for increasing dimension.
+    from_layer = 'conv1_relu'
+    ResBasic333Body(net, from_layer, '2a', out2a=64, out2b=64, out2c=256, stride=1, use_branch1=True) # 75
+    ResBasic333Body(net, 'res2a', '2b', out2a=64, out2b=64, out2c=256, stride=1, use_branch1=False)
+
+    ResBasic333Body(net, 'res2b', '3a', out2a=256, out2b=256, out2c=256, stride=2, use_branch1=True) # 75 --> 38
+    ResBasic333Body(net, 'res3a', '3d', out2a=256, out2b=256, out2c=256, stride=1, use_branch1=False) # 38
+
+    from_layer = 'res3d'
+    ResBasic333Body(net, from_layer, '4a', out2a=256, out2b=256, out2c=1024, stride=2, use_branch1=True) # 38 --> 19 : stride = 2    
+    ResBasic333Body(net, 'res4a', '4b', out2a=256, out2b=256, out2c=1024, stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## for CIFAR-10 by LYW : ResNet 19 Layers with only conv 3x3 in 14th_Sep_2016
+
+def ResNet19_Conv3x3_k2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayerWithBias(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300 --> 150
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+    #net.pool1 = L.Pooling(net.conv1, pool=P.Pooling.MAX, kernel_size=2, stride=2) # 150 --> 75 : in July 5th 2016 by LYW
+
+    # use_branch1 means that projection shortcut is for increasing dimension.
+    from_layer = 'conv1_relu'
+    ResBasic333Body(net, from_layer, '2a', out2a=128, out2b=128, out2c=512, stride=1, use_branch1=True) # 75
+    ResBasic333Body(net, 'res2a', '2b', out2a=128, out2b=128, out2c=512, stride=1, use_branch1=False)
+
+    ResBasic333Body(net, 'res2b', '3a', out2a=128, out2b=128, out2c=512, stride=2, use_branch1=True) # 75 --> 38
+    ResBasic333Body(net, 'res3a', '3d', out2a=256, out2b=256, out2c=512, stride=1, use_branch1=False) # 38
+
+    from_layer = 'res3d'
+    ResBasic333Body(net, from_layer, '4a', out2a=256, out2b=256, out2c=1024, stride=2, use_branch1=True) # 38 --> 19 : stride = 2    
+    ResBasic333Body(net, 'res4a', '4b', out2a=256, out2b=256, out2c=1024, stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## for SSD by LYW : squeezeNet Layers with freeze layers in June_14_2016 
+def SqueezeFire(net, from_layer, block_name, outS1, outE1, outE3):
+  # ResBody(net, 'pool1', '2a', 64, 64, 256, 1, True)
+
+  squeeze_postfix = 'squeeze1x1'
+
+  conv_prefix = '{}/'.format(block_name) # 'fire2/'
+  conv_postfix = squeeze_postfix
+
+  convS_name = '{}{}'.format(conv_prefix,conv_postfix)
+  reluS_name = '{}/relu_{}'.format(block_name,squeeze_postfix)
+
+
+  #Squeeze
+  # parameters for convolution layer with batchnorm.
+  kwargs = {
+      'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+      'weight_filler': dict(type='xavier'),
+      'bias_filler': dict(type='constant', value=0) }
+
+  net[convS_name] = L.Convolution(net[from_layer], num_output=outS1, kernel_size=1, stride=1, **kwargs)
+  net[reluS_name] = L.ReLU(net[convS_name], in_place=True)
+
+  #Expand
+  merge_layers=[]
+  expand_prefix = 'expand'
+  expand_postfix_1 = '1x1'
+  expand_postfix_3 = '3x3'
+  
+  convE1_name = '{}/{}{}'.format(block_name,expand_prefix,expand_postfix_1)
+  convE3_name = '{}/{}{}'.format(block_name,expand_prefix,expand_postfix_3)
+
+  reluE1_name = '{}/relu_{}{}'.format(block_name,expand_prefix,expand_postfix_1)
+  reluE3_name = '{}/relu_{}{}'.format(block_name,expand_prefix,expand_postfix_3)
+
+  # 1x1
+  net[convE1_name] = L.Convolution(net[reluS_name], num_output=outE1, kernel_size=1, stride=1, **kwargs)
+  net[reluE1_name] = L.ReLU(net[convE1_name], in_place=True)
+  merge_layers.append(net[reluE1_name]) 
+
+  # 3x3
+  net[convE3_name] = L.Convolution(net[reluS_name], num_output=outE3, kernel_size=3, pad=1, stride=1, **kwargs)
+  net[reluE3_name] = L.ReLU(net[convE3_name], in_place=True)
+  merge_layers.append(net[reluE3_name]) 
+
+  out_layer = '{}/concat'.format(block_name)
+  net[out_layer] = L.Concat(*merge_layers, axis=1)
+
+
+## for SSD by LYW : squeezeNet Layers with freeze layers in June_14_2016 
+def SqueezeNetBodyWithResNet(net, from_layer, unFreeze_ConvLayers=[] ):
+    
+    kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'weight_filler': dict(type='xavier'),
+        'bias_filler': dict(type='constant', value=0)}
+
+    relu_prefix = 'relu_'
+    relu_name = '{}conv1'.format(relu_prefix)
+
+    assert from_layer in net.keys()
+    net.conv1 = L.Convolution(net[from_layer], num_output=96, kernel_size=7, pad=3, stride=2,**kwargs) # 300--> 150
+    net[relu_name] = L.ReLU(net.conv1, in_place=True) 
+    net.pool1 = L.Pooling(net[relu_name], pool=P.Pooling.MAX, kernel_size=3, stride=2) # 150 --> 75
+
+
+    SqueezeFire(net,'pool1','fire2',16,64,64) # output : fire2/concat
+    SqueezeFire(net,'fire2/concat','fire3',16,64,64) #output : fire3/concat
+    net['fire3_EltAdd'] = L.Eltwise(net['fire2/concat'], net['fire3/concat']) # residual
+
+
+    SqueezeFire(net,'fire3_EltAdd','fire4',32,128,128) # output : fire4/concat
+    net['pool4'] = L.Pooling(net['fire4/concat'], pool=P.Pooling.MAX, kernel_size=3, stride=2)   # 75 --> 38
+    SqueezeFire(net,'pool4','fire5',32,128,128) #output : fire5/concat ( convLayer = fire5/squeeze1x1)
+    net['fire5_EltAdd'] = L.Eltwise(net['pool4'], net['fire5/concat']) # residual
+
+
+    SqueezeFire(net,'fire5_EltAdd','fire6',48,192,192) # output : fire6/concat
+    SqueezeFire(net,'fire6/concat','fire7',48,192,192) #output : fire7/concat
+    net['fire7_EltAdd'] = L.Eltwise(net['fire6/concat'], net['fire7/concat']) # residual
+    SqueezeFire(net,'fire7_EltAdd','fire8',64,256,256) #output : fire8/concat  --> ## Conv layer : fire8/squeeze1x1
+
+    net['pool8'] = L.Pooling(net['fire8/concat'], pool=P.Pooling.MAX, kernel_size=3, stride=2)  # 38 --> 19
+    SqueezeFire(net,'pool8','fire9',64,256,256) #output : fire9/concat  --> ## Conv layer : fire9/squeeze1x1
+    net['fire9_EltAdd'] = L.Eltwise(net['pool8'], net['fire9/concat']) # residual
+
+    #net['fire9_EltAdd'] = L.Dropout(net['fire9_EltAdd'], dropout_ratio=0.5, in_place=True)
+    
+
+
+    # Update unfreeze layers.
+    kwargs['param'] =  [dict(lr_mult=1, decay_mult=1), dict(lr_mult=1, decay_mult=0)]
+    layers = net.keys()
+    for unFreeze_layer in unFreeze_ConvLayers:
+        if unFreeze_layer in layers:
+            net.update(unFreeze_layer, kwargs)
+    
+    return net
+
+#update commit
