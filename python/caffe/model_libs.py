@@ -1029,8 +1029,50 @@ def ResBasic333Body(net, from_layer, block_name, out2a, out2b, out2c, stride, us
   relu_name = '{}_relu'.format(res_name)
   net[relu_name] = L.ReLU(net[res_name], in_place=True)
 
+def ResBasic33Body(net, from_layer, block_name, out2a, out2b, stride, use_branch1):
+  # ResBody(net, 'pool1', '2a', 64, 64, 256, 1, True)
 
-## for CIFAR-10 by LYW : ResNet 19 Layers with only conv 3x3 in 12th_Sep_2016
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    ConvBNLayer(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out2b, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch2a'
+  ConvBNLayer(net, from_layer, branch_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=3, pad=1, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  out_name = '{}{}'.format(conv_prefix, branch_name)
+
+  branch_name = 'branch2b'
+  ConvBNLayer(net, out_name, branch_name, use_bn=True, use_relu=True,
+      num_output=out2b, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, branch_name)
+
+  res_name = 'res{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[branch2]) #layer saved!
+  relu_name = '{}_relu'.format(res_name)
+  net[relu_name] = L.ReLU(net[res_name], in_place=True)
+
+## for CIFAR-10 by LYW : ResNet 19 Layers with only bottleneck conv 3x3 in 12th_Sep_2016
 
 def ResNet19_Conv3x3_Cifar10(net, from_layer, global_pool=True):
     
@@ -1065,6 +1107,46 @@ def ResNet19_Conv3x3_Cifar10(net, from_layer, global_pool=True):
     net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
 
     return net
+
+## for CIFAR-10 by LYW : ResNet 19 Layers with only basic conv 3x3 in 12th_Sep_2016
+
+def ResNet19_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayerWithBias(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300 --> 150
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+    #net.pool1 = L.Pooling(net.conv1, pool=P.Pooling.MAX, kernel_size=2, stride=2) # 150 --> 75 : in July 5th 2016 by LYW
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 75
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=512, out2b=512,  stride=2, use_branch1=True) # 75 --> 38
+    ResBasic33Body(net, 'res3a', '3b', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    ResBasic33Body(net, 'res3b', '3c', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+
+    from_layer = 'res3c'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38 --> 19 : stride = 2    
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4c_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
 
 ## for CIFAR-10 by LYW : ResNet 19 Layers with only conv 3x3 in 14th_Sep_2016
 
