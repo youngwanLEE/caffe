@@ -68,6 +68,9 @@ models/*
 *leveldb
 *lmdb
 
+examples/videos/*
+*.mp4
+
 # build, distribute, and bins (+ python proto bindings)
 build
 .build_debug/*

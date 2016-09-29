@@ -48,7 +48,7 @@ caffe_root = os.getcwd()
 # Set true if you want to start training right after generating all files.
 run_soon = True
 # The video file path
-video_file = "examples/videos/ILSVRC2015_train_00755001.mp4"
+video_file = "/home/youngwan/caffe/examples/videos/ILSVRC2015_train_00755001.mp4"
 
 # The parameters for the video demo
 

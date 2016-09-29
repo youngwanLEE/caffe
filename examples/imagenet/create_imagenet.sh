@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # Create the imagenet lmdb inputs
 # N.B. set the path to the imagenet train + val data dirs
+set -e
 
 EXAMPLE=examples/imagenet
 DATA=data/ilsvrc12
@@ -11,7 +12,7 @@ VAL_DATA_ROOT=/path/to/imagenet/val/
 
 # Set RESIZE=true to resize the images to 256x256. Leave as false if images have
 # already been resized using another tool.
-RESIZE=false
+RESIZE=true
 if $RESIZE; then
   RESIZE_HEIGHT=256
   RESIZE_WIDTH=256
