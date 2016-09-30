@@ -16,7 +16,11 @@
 
 
 #./build/tools/caffe time --model=models/CIFAR-10/resnet_15_conv3x3_basic_l4_SGDR/deploy.prototxt --iterations 5 --gpu 0
-./build/tools/caffe time --model=models/CIFAR-10/resnet_15_conv3x3_basic_l3_poly/deploy.prototxt --iterations 5 --gpu 0
+#./build/tools/caffe time --model=models/CIFAR-10/resnet_15_conv3x3_basic_l3_poly/deploy.prototxt --iterations 5 --gpu 0
+
 
 #./build/tools/caffe time --model=models/CIFAR-10/preActiv_resnet_15_basic_l4_SGDR/deploy.prototxt --iterations 5 --gpu 0
 
+
+#inception
+./build/tools/caffe time --model=models/CIFAR-10/inception_res_v2_cifar10/deploy.prototxt --iterations 5 --gpu 0
