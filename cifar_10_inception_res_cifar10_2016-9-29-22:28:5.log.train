@@ -1,0 +1,4 @@
+#Iters Seconds TrainingLoss LearningRate
+0   0.176650  2.94601  0.1
+10  1.796335  4.03907  0.1
+20  3.466879  3.02031  0.1
