@@ -23,4 +23,6 @@
 
 
 #inception
-./build/tools/caffe time --model=models/CIFAR-10/inception_res_v2_cifar10/deploy.prototxt --iterations 5 --gpu 0
+#./build/tools/caffe time --model=models/CIFAR-10/inception_res_l3_cifar10/deploy.prototxt --iterations 5 --gpu 0
+
+./build/tools/caffe time --model=models/CIFAR-10/inception_res_l2_v2_cifar10/deploy.prototxt --iterations 5 --gpu 0

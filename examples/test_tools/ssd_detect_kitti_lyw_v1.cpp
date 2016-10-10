@@ -235,7 +235,7 @@ DEFINE_string(mean_value, "104,117,123",
     "Either mean_file or mean_value should be provided, not both.");
 DEFINE_string(out_file, "",
     "If provided, store the detection results in the out_file.");
-DEFINE_double(confidence_threshold, 0.35,
+DEFINE_double(confidence_threshold, 0.5,
     "Only store detections with score higher than the threshold.");
 
 int main(int argc, char** argv) {
@@ -367,7 +367,7 @@ int main(int argc, char** argv) {
       }
     }
     cv::imshow("Detection results",img);
-    cv::waitKey(500);
+    cv::waitKey(100);
 
   }
   dAvgTime = dTimeSum / (double)nCnt;

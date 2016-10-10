@@ -901,6 +901,68 @@ def ConvBNLayerFreeze(net, from_layer, out_layer, use_bn, use_relu, num_output,
     relu_name = '{}_relu'.format(conv_name)
     net[relu_name] = L.ReLU(net[conv_name], in_place=True)
 
+def ConvBNLayerBiasFreeze(net, from_layer, out_layer, use_bn, use_relu, num_output,
+    kernel_size, pad, stride, use_scale=True, eps=0.001, conv_prefix='', conv_postfix='',
+    bn_prefix='', bn_postfix='_bn', scale_prefix='', scale_postfix='_scale',
+    bias_prefix='', bias_postfix='_bias',Freeze=True):
+  if use_bn:
+    # parameters for convolution layer with batchnorm.
+    kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    # parameters for batchnorm layer.
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': eps,
+        }
+    # parameters for scale bias layer after batchnorm.
+    if use_scale:
+      sb_kwargs = {
+          'bias_term': True,
+          'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+          'filler': dict(type='constant', value=1.0),
+          'bias_filler': dict(type='constant', value=0.0),
+          }
+    else:
+      bias_kwargs = {
+          'param': [dict(lr_mult=0, decay_mult=0)],
+          'filler': dict(type='constant', value=0.0),
+          }
+  else:
+    kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'weight_filler': dict(type='xavier'),
+        'bias_filler': dict(type='constant', value=0)
+        }
+
+  conv_name = '{}{}{}'.format(conv_prefix, out_layer, conv_postfix)
+  [kernel_h, kernel_w] = UnpackVariable(kernel_size, 2)
+  [pad_h, pad_w] = UnpackVariable(pad, 2)
+  [stride_h, stride_w] = UnpackVariable(stride, 2)
+  if kernel_h == kernel_w:
+    net[conv_name] = L.Convolution(net[from_layer], num_output=num_output,
+        kernel_size=kernel_h, pad=pad_h, stride=stride_h, **kwargs)
+  else:
+    net[conv_name] = L.Convolution(net[from_layer], num_output=num_output,
+        kernel_h=kernel_h, kernel_w=kernel_w, pad_h=pad_h, pad_w=pad_w,
+        stride_h=stride_h, stride_w=stride_w, **kwargs)
+  if use_bn:
+    bn_name = '{}{}{}'.format(bn_prefix, out_layer, bn_postfix)
+    net[bn_name] = L.BatchNorm(net[conv_name], in_place=True, **bn_kwargs)
+    if use_scale:
+      sb_name = '{}{}{}'.format(scale_prefix, out_layer, scale_postfix)
+      net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    else:
+      bias_name = '{}{}{}'.format(bias_prefix, out_layer, bias_postfix)
+      net[bias_name] = L.Bias(net[bn_name], in_place=True, **bias_kwargs)
+  if use_relu:
+    relu_name = '{}_relu'.format(conv_name)
+    net[relu_name] = L.ReLU(net[conv_name], in_place=True)
+
+
+
 def CreateAnnotatedDataLayerLEVELDB(source, batch_size=100, backend=P.Data.LEVELDB,
         output_label=True, train=True,
         transform_param={}):
@@ -1098,6 +1160,52 @@ def ResBasic33Body(net, from_layer, block_name, out2a, out2b, stride, use_branch
   net[res_name] = L.Eltwise(net[branch1], net[branch2]) #layer saved!
   relu_name = '{}_relu'.format(res_name)
   net[relu_name] = L.ReLU(net[res_name], in_place=True)
+
+
+
+def ResBasic33BodyFreezed(net, from_layer, block_name, out2a, out2b, stride, use_branch1):
+  # ResBody(net, 'pool1', '2a', 64, 64, 256, 1, True)
+
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    ConvBNLayerFreeze(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out2b, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch2a'
+  ConvBNLayerFreeze(net, from_layer, branch_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=3, pad=1, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  out_name = '{}{}'.format(conv_prefix, branch_name)
+
+  branch_name = 'branch2b'
+  ConvBNLayerFreeze(net, out_name, branch_name, use_bn=True, use_relu=True,
+      num_output=out2b, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, branch_name)
+
+  res_name = 'res{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[branch2]) #layer saved!
+  relu_name = '{}_relu'.format(res_name)
+  net[relu_name] = L.ReLU(net[res_name], in_place=True)
+
 
 ## for CIFAR-10 by LYW : ResNet 19 Layers with only bottleneck conv 3x3 in 12th_Sep_2016
 
@@ -2133,7 +2241,7 @@ def RoR_15_Conv3x3_basic_l4_cifar_100(net, from_layer, global_pool=True):
 
 
 
-
+## by youngwan in 2016.09.29.
 def Inception_ResBody(net, from_layer, block_name, out2a, out2b_1,out2b_3,out2c_1,out2c_3,out_merge, stride, use_branch1):
   # ResBody(net, 'pool1', '2a', 64, 64, 256, 1, True)
 
@@ -2247,7 +2355,7 @@ def Inception_ResBody(net, from_layer, block_name, out2a, out2b_1,out2b_3,out2c_
 
 
 
-
+## by youngwan in 2016.09.29.
 def Inception_Res_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
     
 
@@ -2256,7 +2364,7 @@ def Inception_Res_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
     scale_prefix = 'scale_'
     scale_postfix = ''
 
-    ConvBNLayerWithBias(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 30 --> 30
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 30 --> 30
         num_output=64, kernel_size=3, pad=1, stride=1,
         bn_prefix=bn_prefix, bn_postfix=bn_postfix,
       scale_prefix=scale_prefix, scale_postfix=scale_postfix
@@ -2285,7 +2393,7 @@ def Inception_Res_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
 
     return net
 
-
+## by youngwan in 2016.09.29.
 def Inception_Res_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
     
 
@@ -2294,7 +2402,7 @@ def Inception_Res_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
     scale_prefix = 'scale_'
     scale_postfix = ''
 
-    ConvBNLayerWithBias(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
         num_output=64, kernel_size=3, pad=1, stride=1,
         bn_prefix=bn_prefix, bn_postfix=bn_postfix,
       scale_prefix=scale_prefix, scale_postfix=scale_postfix
@@ -2323,8 +2431,552 @@ def Inception_Res_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
 
     return net
 
+## by youngwan in 2016.09.29.
+def Inception_l4_Res_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
+    
 
-def Inception_Res_v2_Cifar10(net, from_layer, global_pool=True):
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=256, out2b_1=256,out2b_3=256,out2c_1=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.10.
+def Inception_l4_Res_Conv3x3_basic_l2_m2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=256, out2b_1=256,out2b_3=256,out2c_1=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=512, out2b=512, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=512, out2b=512,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.08.
+def Inception_Res_Conv3x3_basic_20L_l2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    ResBasic33Body(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) 
+    ResBasic33Body(net, 'res3b', '3c', out2a=256, out2b=256,  stride=1, use_branch1=False) 
+    Inception_ResBody(net,'res3c','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.08.
+def Inception_Res_Conv3x3_basic_20L_l3_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    ResBasic33Body(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) 
+    ResBasic33Body(net, 'res3b', '3c', out2a=256, out2b=256,  stride=1, use_branch1=False) 
+    Inception_ResBody(net,'res3c','3a',out2a=128, out2b_1=128,out2b_3=256,out2c_1=128,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.08.
+def Inception_Res_Conv3x3_basic_20L_l3_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    ResBasic33Body(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) 
+    ResBasic33Body(net, 'res3b', '3c', out2a=256, out2b=256,  stride=1, use_branch1=False) 
+    Inception_ResBody(net,'res3c','3a',out2a=128, out2b_1=128,out2b_3=256,out2c_1=128,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.09.29.
+def Inception_Res_Conv3x3_basic_19L_l2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    Inception_ResBody(net,'inception_3a','3b',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+
+
+    from_layer = 'inception_3b'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.10.06.
+def Inception_Res_Conv3x3_basic_l4_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=512, out2b=512,  stride=2, use_branch1=True) # 32-->16
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=256, out2b_1=256,out2b_3=512,out2c_1=256,out2c_3=512,out_merge=512,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.01.
+def Inception_Res_Conv3x3_basic_l2_Cifar100(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc100 = L.InnerProduct(net.pool5, num_output=100, weight_filler=dict(type='xavier'))
+
+    return net
+
+# by youngwan in 2016. 10. 01.
+def Inception_Res_Conv3x3_l2_v2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res2c','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=2,use_branch1=True)
+    ResBasic33Body(net, 'inception_3a', '3b', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    
+
+    from_layer = 'res3b'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+# by youngwan in 2016. 10. 05.
+def Inception_Res_Conv3x3_l2_v3_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res2c','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=2,use_branch1=True) # 32-->16
+    ResBasic33Body(net, 'inception_3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=True) # 16
+    
+
+    from_layer = 'res3b'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+
+# by youngwan in 2016. 10. 01.
+def Inception_Res_Conv3x3_l2_v2_Cifar100(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res2c','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=2,use_branch1=True)
+    ResBasic33Body(net, 'inception_3a', '3b', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    
+
+    from_layer = 'res3b'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc100 = L.InnerProduct(net.pool5, num_output=100, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.09.30.
+def Inception_Res_Conv3x3_basic_l2_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300 --> 150
+        num_output=64, kernel_size=3, pad=1, stride=2,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 150 --> 75
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 75-->38
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False) # 38
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38 --> 19   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+        net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+        net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.05.
+def Inception_Res_Conv3x3_basic_l2_SSD_Freezed(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300 --> 150
+        num_output=64, kernel_size=3, pad=1, stride=2,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33BodyFreezed(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 150 --> 75
+    ResBasic33BodyFreezed(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33BodyFreezed(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 75-->38
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False) # 38
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38 --> 19   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+        net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+        net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+
+
+
+    return net
+
+
+
+## by youngwan in 2016.09.30.
+def Inception_Res_Conv3x3_basic_l2_imageNet(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300 --> 150
+        num_output=64, kernel_size=3, pad=1, stride=2,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 150 --> 75
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 75-->38
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False) # 38
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38 --> 19   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+        net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+        net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+
+    return net
+
+## by youngwan in 2016.09.30.
+def Inception_Res_Conv3x3_basic_l3_Cifar10(net, from_layer, global_pool=True):
     
 
     bn_prefix = 'bn_'
@@ -2333,6 +2985,44 @@ def Inception_Res_v2_Cifar10(net, from_layer, global_pool=True):
     scale_postfix = ''
 
     ConvBNLayerWithBias(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=64, out2b_1=64,out2b_3=384,out2c_1=64,out2c_3=384,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.09.29.
+def Inception_Res_v2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
         num_output=64, kernel_size=3, pad=1, stride=1,
         bn_prefix=bn_prefix, bn_postfix=bn_postfix,
       scale_prefix=scale_prefix, scale_postfix=scale_postfix
@@ -2360,5 +3050,81 @@ def Inception_Res_v2_Cifar10(net, from_layer, global_pool=True):
       net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
 
     net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.03.
+def Inception_Res_l2_v2_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300 --> 150
+        num_output=64, kernel_size=3, pad=1, stride=2,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 150 --> 75
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    Inception_ResBody(net,'res2c','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=2,use_branch1=True) # 75-->38
+    ResBasic33Body(net, 'inception_3a', '3b', out2a=256, out2b=256,  stride=2, use_branch1=True) # 38
+
+    
+    from_layer = 'res3b'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38 --> 19   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+        net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+        net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+
+    return net
+
+
+# by youngwan in 2016. 10. 05.
+def Inception_Res_Conv3x3_l2_v3_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    #ConvBNLayer ConvBNLayerWithBias
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300-->150
+        num_output=64, kernel_size=3, pad=1, stride=2,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 150-->75
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res2c','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=2,use_branch1=True) # 75-->38
+    ResBasic33Body(net, 'inception_3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) # 38
+    
+
+    from_layer = 'res3b'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38 --> 19
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
 
     return net

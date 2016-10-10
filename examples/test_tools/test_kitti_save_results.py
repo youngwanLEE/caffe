@@ -46,8 +46,18 @@ def get_labelname(labelmap, labels):
 #model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Res_15L_l4_ASP4_350x250/deploy.prototxt'
 #model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Res_15L_l4_ASP4_350x250/KITTI_SSD_Res_15L_l4_ASP4_350x250_iter_150000.caffemodel'
 
-model_def = '/home/youngwan/caffe/models/ResNet/KITTI/SSD_ResNet_ASP4_19L_350x250/deploy.prototxt'
-model_weights = '/home/youngwan/caffe/models/ResNet/KITTI/SSD_ResNet_ASP4_19L_350x250/ResNet_KITTI_SSD_ResNet_ASP4_350x250_19L_conv4350x250_iter_450000.caffemodel'
+#model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_350x250/deploy.prototxt'
+#model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_350x250/KITTI_SSD_Inception_Res_l2_ASP4_350x250_iter_100000.caffemodel'
+
+
+# model_def = '/home/youngwan/caffe/models/VGGNet/KITTI/deploy.prototxt'
+# model_weights = '/home/youngwan/caffe/models/VGGNet/KITTI/VGG_KITTI_SSD_300x300_iter_60000.caffemodel'
+
+model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/deploy.prototxt'
+model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/KITTI_SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250_iter_100000.caffemodel'
+
+
+
 
 net = caffe.Net(model_def,      # defines the structure of the model
                 model_weights,  # contains the trained weights
@@ -71,14 +81,15 @@ cntcnt = 0
 
 
 now = datetime.datetime.now()
-job_name = "SSD_Res_19L_ASP4_test_{}".format(resize)
-save_dir = "/home/youngwan/caffe/jobs/KITTI/test_bechmark_results_imgs/{}".format(job_name)
+job_name = "SSD_Inception_Res_l2_unfreezed_cifar10_pretrained_test_{}".format(resize)
+save_dir = "/home/youngwan/caffe/jobs/KITTI/test_KITTI_RAW_PED_results_imgs/{}".format(job_name)
 save_file = "{}/{}_runTime_{}-{}-{}-{}:{}.txt".format(save_dir,job_name,now.year,now.month,now.day,now.hour,now.minute)
 make_if_not_exist(save_dir)
 
 
 
-img_path ="/home/youngwan/data/KITTI/kitti_test_benchmark_img/"
+#img_path ="/home/youngwan/data/KITTI/kitti_test_benchmark_img/"
+img_path ="/home/youngwan/data/KITTI/raw/2011_09_28/2011_09_28_drive_0021_sync/image_02/"
 image_list = os.listdir(img_path)
 sorted_list = sorted(image_list)
 for s in sorted_list:
@@ -98,7 +109,7 @@ for s in sorted_list:
     det_xmax = detections[0,0,:,5]
     det_ymax = detections[0,0,:,6]
     # Get detections with confidence higher than 0.6.
-    top_indices = [i for i, conf in enumerate(det_conf) if conf >= 0.4]
+    top_indices = [i for i, conf in enumerate(det_conf) if conf >= 0.6]
     top_conf = det_conf[top_indices]
     top_label_indices = det_label[top_indices].tolist()
     top_labels = get_labelname(voc_labelmap, top_label_indices)
