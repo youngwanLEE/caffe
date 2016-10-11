@@ -229,7 +229,7 @@ void Detector::Preprocess(const cv::Mat& img,
 
 DEFINE_string(mean_file, "",
     "The mean file used to subtract from the input image.");
-DEFINE_string(mean_value, "104,117,123",
+DEFINE_string(mean_value, "96,99,94",
     "If specified, can be one value or can be same as image channels"
     " - would subtract from the corresponding channel). Separated by ','."
     "Either mean_file or mean_value should be provided, not both.");

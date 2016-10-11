@@ -1,0 +1,50 @@
+item {
+  name: "none_of_the_above"
+  label: 0
+  display_name: "background"
+}
+item {
+  name: "Car"
+  label: 1
+  display_name: "Car"
+}
+item {
+  name: "Van"
+  label: 2
+  display_name: "Van"
+}
+item {
+  name: "Truck"
+  label: 3
+  display_name: "Truck"
+}
+item {
+  name: "Pedestrian"
+  label: 4
+  display_name: "Pedestrian"
+}
+item {
+  name: "Person_sitting"
+  label: 5
+  display_name: "Person_sitting"
+}
+item {
+  name: "Cyclist"
+  label: 6
+  display_name: "Cyclist"
+}
+item {
+  name: "Tram"
+  label: 7
+  display_name: "Tram"
+}
+item {
+  name: "Misc"
+  label: 8
+  display_name: "Misc"
+}
+item {
+  name: "DontCare"
+  label: 9
+  display_name: "DontCare"
+}

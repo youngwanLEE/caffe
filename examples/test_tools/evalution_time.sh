@@ -16,18 +16,28 @@
 #Inception_res_NARROW
 #./build/examples/test_tools/ssd_detect_kitti_lyw_v1.bin models/New/KITTI/SSD_Inception_Res_l2_ASP4_350x250/deploy.prototxt models/New/KITTI/SSD_Inception_Res_l2_ASP4_350x250/KITTI_SSD_Inception_Res_l2_ASP4_350x250_iter_100000.caffemodel /home/youngwan/data/demos/demo_0225.txt jobs/New/KITTI/SSD_PreActiv_Res_15L_l4_ASP4_350x250/
 
-#./build/examples/test_tools/ssd_detect_kitti_lyw_v1.bin models/New/KITTI/SSD_Inception_Res_l2_ASP4_350x250/deploy.prototxt models/New/KITTI/SSD_Inception_Res_l2_ASP4_350x250/KITTI_SSD_Inception_Res_l2_ASP4_350x250_iter_100000.caffemodel /home/youngwan/data/demos/Narrow.txt jobs/New/KITTI/SSD_PreActiv_Res_15L_l4_ASP4_350x250/
+#./build/examples/test_tools/ssd_detect_kitti_lyw_v1.bin models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/deploy.prototxt models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/KITTI_SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250_iter_100000.caffemodel /home/youngwan/data/demos/Narrow.txt jobs/New/KITTI/SSD_PreActiv_Res_15L_l4_ASP4_350x250/
 
+#Inception_res_GoPro
+#./build/examples/test_tools/ssd_detect_kitti_lyw_v1.bin models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/deploy.prototxt models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/KITTI_SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250_iter_100000.caffemodel /home/youngwan/data/demos/demo_0225.txt jobs/New/KITTI/SSD_PreActiv_Res_15L_l4_ASP4_350x250/
 
 #Inception_res_KITTI_ped
-./build/examples/test_tools/ssd_detect_kitti_lyw_v1.bin models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/deploy.prototxt models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/KITTI_SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250_iter_100000.caffemodel /home/youngwan/data/KITTI/KITTI_raw_ped.txt jobs/New/KITTI/SSD_PreActiv_Res_15L_l4_ASP4_350x250/
+#./build/examples/test_tools/ssd_detect_kitti_lyw_v1.bin models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/deploy.prototxt models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/KITTI_SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250_iter_100000.caffemodel /home/youngwan/data/KITTI/KITTI_raw_ped.txt jobs/New/KITTI/SSD_PreActiv_Res_15L_l4_ASP4_350x250/
 
+#for Video
+#./build/examples/test_tools/ssd_detect_lyw_video.bin models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/deploy.prototxt models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/KITTI_SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250_iter_100000.caffemodel /home/youngwan/data/demos/GOPR0225.mp4 jobs/New/KITTI/SSD_PreActiv_Res_15L_l4_ASP4_350x250/
 
 
 
 #VGGNet KITTI_ped
 #./build/examples/test_tools/ssd_detect_kitti_lyw_v1.bin models/VGGNet/KITTI/deploy.prototxt models/VGGNet/KITTI/VGG_KITTI_SSD_300x300_iter_60000.caffemodel /home/youngwan/data/KITTI/KITTI_raw_ped.txt jobs/New/KITTI/SSD_PreActiv_Res_15L_l4_ASP4_350x250/
 
+#VGGNet GoPro
+#./build/examples/test_tools/ssd_detect_kitti_lyw_v1.bin models/VGGNet/KITTI/deploy.prototxt models/VGGNet/KITTI/VGG_KITTI_SSD_300x300_iter_60000.caffemodel /home/youngwan/data/demos/demo_0225.txt jobs/New/KITTI/SSD_PreActiv_Res_15L_l4_ASP4_350x250/
+#/home/youngwan/data/demos/Narrow.txt
+
+#VGGNet HY_NARROW
+./build/examples/test_tools/ssd_detect_kitti_lyw_v1.bin models/VGGNet/KITTI/deploy.prototxt models/VGGNet/KITTI/VGG_KITTI_SSD_300x300_iter_60000.caffemodel /home/youngwan/data/demos/Narrow.txt jobs/New/KITTI/SSD_PreActiv_Res_15L_l4_ASP4_350x250/
 
 
 #KITTI
