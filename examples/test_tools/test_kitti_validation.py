@@ -43,8 +43,11 @@ def get_labelname(labelmap, labels):
         assert found == True
     return labelnames
 
-model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_BN_350x250/deploy.prototxt'
-model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_BN_350x250/KITTI_SSD_Inception_Res_l2_ASP4_350x250_iter_100000.caffemodel'
+
+model_def = '/home/youngwan/caffe/models/New/KITTI/inception_v2/SSD_Inception_v2_8_preActRes_ASP4_BN_cifar10_pretrained_350x250/deploy.prototxt'
+model_weights = '/home/youngwan/caffe/models/New/KITTI/inception_v2/SSD_Inception_v2_8_preActRes_ASP4_BN_cifar10_pretrained_350x250/KITTI_SSD_Inception_v2_8_preActRes_ASP4_BN_cifar10_pretrained_350x250_iter_100000.caffemodel'
+
+
 
 #variable
 cntFrame = 0
@@ -63,6 +66,7 @@ net = caffe.Net(model_def,      # defines the structure of the model
 transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
 transformer.set_transpose('data', (2, 0, 1))
 transformer.set_mean('data', np.array([96,99,94])) # mean pixel
+#transformer.set_mean('data', np.array([104,117,123])) # mean pixel
 transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
 transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
 
@@ -73,8 +77,8 @@ conf_th = 0.0
 
 
 now = datetime.datetime.now()
-job_name = "SSD_Inception_Res_l2_BN_ASP4_350x250_CIFAR10_pretrained_trainVal_test_{}".format(resize)
-save_dir = "/home/youngwan/caffe/jobs/KITTI/validation_result/{}".format(job_name)
+job_name = "SSD_inception_v2_8_ASP4_PED3_BN_cifar_pretrained_trainVal_test_{}".format(resize)
+save_dir = "/home/youngwan/caffe/jobs/KITTI/validation_result/inception_v2/{}".format(job_name)
 save_file = "{}/{}_runTime_{}-{}-{}-{}:{}.txt".format(save_dir,job_name,now.year,now.month,now.day,now.hour,now.minute)
 make_if_not_exist(save_dir)
 fp = open(save_file, 'w')

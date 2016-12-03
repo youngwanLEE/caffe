@@ -49,12 +49,15 @@ def get_labelname(labelmap, labels):
 #model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_350x250/deploy.prototxt'
 #model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_350x250/KITTI_SSD_Inception_Res_l2_ASP4_350x250_iter_100000.caffemodel'
 
+model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_v2_Res_l2_ASP4_350x250/deploy.prototxt'
+model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_v2_Res_l2_ASP4_350x250/KITTI_SSD_Inception_v2_Res_l2_ASP4_350x250_iter_100000.caffemodel'
 
-# model_def = '/home/youngwan/caffe/models/VGGNet/KITTI/deploy.prototxt'
-# model_weights = '/home/youngwan/caffe/models/VGGNet/KITTI/VGG_KITTI_SSD_300x300_iter_60000.caffemodel'
 
-model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/deploy.prototxt'
-model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250/KITTI_SSD_Inception_Res_l2_ASP4_CIFAR10_Pretrained_350x250_iter_100000.caffemodel'
+#model_def = '/home/youngwan/caffe/models/VGGNet/KITTI/deploy.prototxt'
+#model_weights = '/home/youngwan/caffe/models/VGGNet/KITTI/VGG_KITTI_SSD_300x300_iter_60000.caffemodel'
+
+#model_def = '/home/youngwan/caffe/models/ResNet/KITTI/SSD_ResNet_ASP4_350x250_19L_conv4350x250/deploy.prototxt'
+#model_weights = '/home/youngwan/caffe/models/ResNet/KITTI/SSD_ResNet_ASP4_350x250_19L_conv4350x250/ResNet_KITTI_SSD_ResNet_ASP4_350x250_19L_conv4350x250_iter_449000.caffemodel'
 
 
 
@@ -66,7 +69,8 @@ net = caffe.Net(model_def,      # defines the structure of the model
 # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
 transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
 transformer.set_transpose('data', (2, 0, 1))
-transformer.set_mean('data', np.array([104,117,123])) # mean pixel
+transformer.set_mean('data', np.array([96,99,94])) # mean pixel
+#transformer.set_mean('data', np.array([104,117,123])) # mean pixel
 transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
 transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
 
@@ -81,15 +85,16 @@ cntcnt = 0
 
 
 now = datetime.datetime.now()
-job_name = "SSD_Inception_Res_l2_unfreezed_cifar10_pretrained_test_{}".format(resize)
-save_dir = "/home/youngwan/caffe/jobs/KITTI/test_KITTI_RAW_PED_results_imgs/{}".format(job_name)
+job_name = "SSD_incep_v2_res_l2_test_{}".format(resize)
+#save_dir = "/home/youngwan/caffe/jobs/KITTI/test_KITTI_RAW_PED_results_imgs/{}".format(job_name)
+save_dir = "/home/youngwan/caffe/jobs/KITTI/test_bechmark_results_imgs/{}".format(job_name)
 save_file = "{}/{}_runTime_{}-{}-{}-{}:{}.txt".format(save_dir,job_name,now.year,now.month,now.day,now.hour,now.minute)
 make_if_not_exist(save_dir)
 
 
 
-#img_path ="/home/youngwan/data/KITTI/kitti_test_benchmark_img/"
-img_path ="/home/youngwan/data/KITTI/raw/2011_09_28/2011_09_28_drive_0021_sync/image_02/"
+img_path ="/home/youngwan/data/KITTI/kitti_test_benchmark_img/"
+#img_path ="/home/youngwan/data/KITTI/raw/2011_09_28/2011_09_28_drive_0021_sync/image_02/"
 image_list = os.listdir(img_path)
 sorted_list = sorted(image_list)
 for s in sorted_list:

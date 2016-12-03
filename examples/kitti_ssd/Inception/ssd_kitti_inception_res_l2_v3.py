@@ -98,8 +98,8 @@ test_data = "/home/youngwan/data/kitti_full/kitti_ssd_test_lmdb"
 #test_data = "/home/youngwan/data/kitti/full_lmdb/kitti_ssd_test_lmdb"
 
 # Specify the batch sampler.
-resize_width = 350#300
-resize_height = 250#300
+resize_width = 512#300
+resize_height = 256#300
 resize = "{}x{}".format(resize_width, resize_height)
 batch_sampler = [
         {

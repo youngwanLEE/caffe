@@ -31,10 +31,10 @@ resume_training = True
 # If true, Remove old model files.
 remove_old_models = False
 
-train_data = "/home/youngwan/data/cifar10/cifar10-gcn-leveldb-splits/cifar10_full_train_leveldb_padded"
-test_data = "/home/youngwan/data/cifar10/cifar10-gcn-leveldb-splits/cifar10_test_leveldb"
-train_mean_file = "/home/youngwan/data/cifar10/cifar10-gcn-leveldb-splits/paddedmean.binaryproto"
-test_mean_file = "/home/youngwan/data/cifar10/cifar10-gcn-leveldb-splits/mean.binaryproto"
+train_data = "/home/cvlab/data/cifar10/cifar10-gcn-leveldb-splits/cifar10_full_train_leveldb_padded"
+test_data = "/home/cvlab/data/cifar10/cifar10-gcn-leveldb-splits/cifar10_test_leveldb"
+train_mean_file = "/home/cvlab/data/cifar10/cifar10-gcn-leveldb-splits/paddedmean.binaryproto"
+test_mean_file = "/home/cvlab/data/cifar10/cifar10-gcn-leveldb-splits/mean.binaryproto"
 
 #backend = leveldb
 
@@ -44,19 +44,19 @@ test_mean_file = "/home/youngwan/data/cifar10/cifar10-gcn-leveldb-splits/mean.bi
 #resize = "{}x{}".format(resize_width, resize_height)
 
 #job_name = "resnet_50_{}".format(resize)#job_name = "SSD_{}".format(resize)
-job_name = "inception_res_l3_cifar10"
+job_name = "inception_v2_8_PreactRes_cifar10"
 # The name of the model. Modify it if you want.
 #[LYW]
 model_name = "cifar_10_{}".format(job_name) #model_name = "VGG_KITTI_{}".format(job_name)
 
 # Directory which stores the model .prototxt file.
-save_dir = "models/CIFAR-10/{}".format(job_name)#save_dir = "models/VGGNet/KITTI/{}".format(job_name)
+save_dir = "models/CIFAR-10/inception_v2/{}".format(job_name)#save_dir = "models/VGGNet/KITTI/{}".format(job_name)
 # Directory which stores the snapshot of models.
 #[LYW]
-snapshot_dir = "models/CIFAR-10/{}".format(job_name)#snapshot_dir = "models/VGGNet/KITTI/{}".format(job_name)
+snapshot_dir = "models/CIFAR-10/inception_v2/{}".format(job_name)#snapshot_dir = "models/VGGNet/KITTI/{}".format(job_name)
 # Directory which stores the job script and log file.
 #[LYW]
-job_dir = "jobs/CIFAR-10/{}".format(job_name)#job_dir = "jobs/VGGNet/KITTI/{}".format(job_name)
+job_dir = "jobs/CIFAR-10/inception_v2/{}".format(job_name)#job_dir = "jobs/VGGNet/KITTI/{}".format(job_name)
 # Directory which stores the detection results.
 #[LYW]
 #output_result_dir = "{}/data/KITTIdevkit/results/kitti/{}/Main".format(os.environ['HOME'], job_name)#output_result_dir = "{}/data/KITTIdevkit/results/kitti/{}/Main".format(os.environ['HOME'], job_name)
@@ -101,7 +101,8 @@ if num_gpus > 0:
 base_lr = 0.05
 
 num_test_image = 10000
-test_batch_size = 128 #1
+test_batch_size = 100 #1
+test_batch_size_per_device = int(math.ceil(float(test_batch_size) / num_gpus))
 test_iter = num_test_image / test_batch_size
 max_iter = 64000  
 #test_iter = 100
@@ -144,6 +145,7 @@ train_transform_param = {
 test_transform_param = {
         'mirror': False,
         'mean_file':test_mean_file,
+        'crop_size':32        
         }
 
 
@@ -169,7 +171,7 @@ net.data, net.label = CreateAnnotatedDataLayerLEVELDB(train_data, batch_size=bat
         train=True, output_label=True,
         transform_param=train_transform_param)
 
-Inception_Res_Conv3x3_basic_l3_Cifar10(net,from_layer='data',global_pool=True)
+Inception_v2_8_PreActRes_Conv3x3_basic_Cifar10(net,from_layer='data',global_pool=True)
 
 net.loss = L.SoftmaxWithLoss(net.fc10, net.label)
 
@@ -183,11 +185,11 @@ with open(train_net_file, 'w') as f:
 
 net = caffe.NetSpec()
 
-net.data, net.label = CreateAnnotatedDataLayerLEVELDB(test_data, batch_size=batch_size_per_device,
+net.data, net.label = CreateAnnotatedDataLayerLEVELDB(test_data, batch_size=test_batch_size_per_device,
         train=False, output_label=True,
         transform_param=test_transform_param)
 
-Inception_Res_Conv3x3_basic_l3_Cifar10(net,from_layer='data',global_pool=True)
+Inception_v2_8_PreActRes_Conv3x3_basic_Cifar10(net,from_layer='data',global_pool=True)
 
 net.accuracy = L.Accuracy(net.fc10, net.label)
 

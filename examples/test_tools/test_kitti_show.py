@@ -46,8 +46,8 @@ def get_labelname(labelmap, labels):
 #model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Res_15L_l4_ASP4_350x250/deploy.prototxt'
 #model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Res_15L_l4_ASP4_350x250/KITTI_SSD_Res_15L_l4_ASP4_350x250_iter_150000.caffemodel'
 
-model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_350x250/deploy.prototxt'
-model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_Res_l2_ASP4_350x250/KITTI_SSD_Inception_Res_l2_ASP4_350x250_iter_100000.caffemodel'
+model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_v2_Res_l2_ASP4_350x250/deploy.prototxt'
+model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Inception_v2_Res_l2_ASP4_350x250/KITTI_SSD_Inception_v2_Res_l2_ASP4_350x250_iter_100000.caffemodel'
 
 net = caffe.Net(model_def,      # defines the structure of the model
                 model_weights,  # contains the trained weights
@@ -56,7 +56,7 @@ net = caffe.Net(model_def,      # defines the structure of the model
 # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
 transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
 transformer.set_transpose('data', (2, 0, 1))
-transformer.set_mean('data', np.array([104,117,123])) # mean pixel
+transformer.set_mean('data', np.array([96,99,94])) # mean pixel
 transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
 transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
 
@@ -78,7 +78,9 @@ cntcnt = 0
 
 
 
-img_path ="/home/youngwan/data/demos/Narrow/"
+#img_path ="/home/youngwan/data/demos/rapid1/"
+img_path ="/home/youngwan/data/KITTI/kitti_test_benchmark_img/"
+
 image_list = os.listdir(img_path)
 sorted_list = sorted(image_list)
 for s in sorted_list:
@@ -98,7 +100,7 @@ for s in sorted_list:
     det_xmax = detections[0,0,:,5]
     det_ymax = detections[0,0,:,6]
     # Get detections with confidence higher than 0.6.
-    top_indices = [i for i, conf in enumerate(det_conf) if conf >= 0.4]
+    top_indices = [i for i, conf in enumerate(det_conf) if conf >= 0.0]
     top_conf = det_conf[top_indices]
     top_label_indices = det_label[top_indices].tolist()
     top_labels = get_labelname(voc_labelmap, top_label_indices)
@@ -159,5 +161,5 @@ for s in sorted_list:
     #plt.savefig(img_name)
     #currentAxis.canvas.print_png(img_name)
     plt.show(block=False)
-    plt.pause(0.0001)
+    plt.pause(1)
     plt.clf()

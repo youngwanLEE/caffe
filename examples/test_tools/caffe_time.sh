@@ -25,4 +25,9 @@
 #inception
 #./build/tools/caffe time --model=models/CIFAR-10/inception_res_l3_cifar10/deploy.prototxt --iterations 5 --gpu 0
 
-./build/tools/caffe time --model=models/CIFAR-10/inception_res_l2_v2_cifar10/deploy.prototxt --iterations 5 --gpu 0
+#./build/tools/caffe time --model=models/CIFAR-10/inception_res_l2_v2_cifar10/deploy.prototxt --iterations 5 --gpu 0
+
+#./build/tools/caffe time --model=models/CIFAR-10/inception_v4/inception_v4_PreactRes_cifar10/deploy.prototxt --iterations 5 --gpu 0
+
+
+./build/tools/caffe time --model=models/New/KITTI/SSD_Inception_v4_Res_basic_OriginASP_BN_cifar10_pretrained_300x300/deploy.prototxt --iterations 5 --gpu 0

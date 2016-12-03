@@ -43,15 +43,15 @@ def get_labelname(labelmap, labels):
         assert found == True
     return labelnames
 
-model_def = '/home/youngwan/caffe/models/New/KITTI/SSD_Res_15L_l4_ASP4_350x250/deploy.prototxt'
-model_weights = '/home/youngwan/caffe/models/New/KITTI/SSD_Res_15L_l4_ASP4_350x250/KITTI_SSD_Res_15L_l4_ASP4_350x250_iter_150000.caffemodel'
+model_def = '/home/youngwan/caffe/models/New/KITTI/inception_v3/SSD_Inception_v3_6_preActRes_ASP4_BN_full_cifar10_pretrained_300x300/deploy.prototxt'
+model_weights = '/home/youngwan/caffe/models/New/KITTI/inception_v3/SSD_Inception_v3_6_preActRes_ASP4_BN_full_cifar10_pretrained_300x300/KITTI_SSD_Inception_v3_6_preActRes_ASP4_BN_full_cifar10_pretrained_300x300_iter_100000.caffemodel'
 
 #variable
 cntFrame = 0
 sumPTime = 0
 avgPTime = 0
-resize_width = 350
-resize_height = 250
+resize_width = 300
+resize_height = 300
 resize = "{}x{}".format(resize_width, resize_height)
 
 
@@ -62,7 +62,7 @@ net = caffe.Net(model_def,      # defines the structure of the model
 # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
 transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
 transformer.set_transpose('data', (2, 0, 1))
-transformer.set_mean('data', np.array([104,117,123])) # mean pixel
+transformer.set_mean('data', np.array([96,99,94])) # mean pixel
 transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
 transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
 
@@ -73,8 +73,8 @@ conf_th = 0.0
 
 
 now = datetime.datetime.now()
-job_name = "SSD_Res_15L_l4_ASP4_350x250_benchmark"
-save_dir = "/home/youngwan/caffe/jobs/KITTI/Benchmark_result/{}".format(job_name)
+job_name = "SSD_inception_v3_6_ASP4_BN_300x300_full_cifar_pretrained_benchmark"
+save_dir = "/home/youngwan/caffe/jobs/KITTI/Benchmark_result/inception_v3/{}".format(job_name)
 save_file = "{}/{}_runTime_{}-{}-{}-{}:{}.txt".format(save_dir,job_name,now.year,now.month,now.day,now.hour,now.minute)
 make_if_not_exist(save_dir)
 fp = open(save_file, 'w')

@@ -1,0 +1,4 @@
+
+python examples/cifar_ssd/cifar_10/inception_v3/execution_inception_v3_5_PreactRes.py
+
+python examples/kitti_ssd/Inception/inception_v3/ssd_kitti_inception_v3_5_300x300_origin_ASP_BN.py 

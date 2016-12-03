@@ -41,40 +41,6 @@ def AddExtraLayers(net, use_batchnorm=True):
 
     return net
 
-#[LYW]
-# Add extra layers on top of the ResNet. by LYW
-def AddExtraLayersToResNet(net, use_batchnorm=True):
-    use_relu = True
-
-    # Add additional convolutional layers.
-    #from_layer = net.keys()[-1]
-    #from_layer = 'res4b35_branch2c' ###[LYW_0608]
-    #from_layer = 'res4b35' #success at 03:18
-    from_layer = net.keys()[-1] #success at 03:18
-
-    out_layer = "conv6_1"
-    ConvBNLayer(net, from_layer, out_layer, use_batchnorm, use_relu, 256, 1, 0, 1)
-
-    from_layer = out_layer
-    out_layer = "conv6_2"
-    ConvBNLayer(net, from_layer, out_layer, use_batchnorm, use_relu, 512, 3, 1, 2)
-
-    for i in xrange(7, 9):
-      from_layer = out_layer
-      out_layer = "conv{}_1".format(i)
-      ConvBNLayer(net, from_layer, out_layer, use_batchnorm, use_relu, 128, 1, 0, 1)
-
-      from_layer = out_layer
-      out_layer = "conv{}_2".format(i)
-      ConvBNLayer(net, from_layer, out_layer, use_batchnorm, use_relu, 256, 3, 1, 2)
-
-    # Add global pooling layer.
-    name = net.keys()[-1]
-    net.pool6 = L.Pooling(net[name], pool=P.Pooling.AVE, global_pooling=True)
-
-    return net
-
-
 ### Modify the following parameters accordingly ###
 # The directory which contains the caffe code.
 # We assume you are running the script at the CAFFE_ROOT.
@@ -89,17 +55,14 @@ resume_training = True
 remove_old_models = False
 
 # The database file for training data. ex) Created by data/VOC0712/create_data.sh
-#train_data = "data/kitti_ssd/kitti_ssd_subset/kitti_ssd_subset_trainval_lmdb"
-#train_data = "data/kitti_ssd/full_lmdb/kitti_ssd_trainval_lmdb"
+
 train_data = "/home/youngwan/data/kitti_ssd_ped3/kitti_ssd_trainval_lmdb"
 test_data = "/home/youngwan/data/kitti_full/kitti_ssd_test_lmdb"
-#train_data = "/home/youngwan/data/kitti/full_lmdb/kitti_ssd_trainval_lmdb"
-# The database file for testing data. ex) Created by data/VOC0712/create_data.sh
-#test_data = "/home/youngwan/data/kitti/full_lmdb/kitti_ssd_test_lmdb"
+
 
 # Specify the batch sampler.
-resize_width = 300#300
-resize_height = 300#300
+resize_width = 350#300
+resize_height = 250#300
 resize = "{}x{}".format(resize_width, resize_height)
 batch_sampler = [
         {
@@ -306,9 +269,6 @@ min_dim = 300
 # conv8_2 ==> 3 x 3
 # pool6 ==> 1 x 1
 
-#mbox_source_layers = ['conv4_3', 'fc7', 'conv6_2', 'conv7_2', 'conv8_2', 'pool6']
-#[LYW]
-
 mbox_source_layers = ['inception_3a', 'res4b', 'conv6_2', 'conv7_2', 'conv8_2', 'pool6']
 
 # in percent %
@@ -333,15 +293,9 @@ else:
 flip = True
 clip = True
 
-# # Solver parameters.
-# # Defining which GPUs to use.
-# gpus = "0"
-# gpulist = gpus.split(",")
-# num_gpus = len(gpulist)
 
 # Solver parameters.
 # Defining which GPUs to use.
-#gpus = "0,1"
 gpus = "0,1"
 gpulist = gpus.split(",")
 num_gpus = len(gpulist)
@@ -370,11 +324,6 @@ elif normalization_mode == P.Loss.FULL:
   # Roughly there are 2000 prior bboxes per image.
   # TODO(weiliu89): Estimate the exact # of priors.
   base_lr *= 2000. / iter_size
-
-# Which layers to freeze (no backward) during training for VGGNet(#[LYW]).
-#freeze_layers = ['conv1_1', 'conv1_2', 'conv2_1', 'conv2_2']
-
-
 
 
 # Evaluate on whole test set.
@@ -458,7 +407,7 @@ net.data, net.label = CreateAnnotatedDataLayer(train_data, batch_size=batch_size
 
 Inception_v2_Res_Conv3x3_basic_l2_SSD(net, from_layer='data',global_pool=False)
 
-AddExtraLayersToResNet( net, use_batchnorm)
+AddExtraLayers( net, use_batchnorm)
 
 mbox_layers = CreateMultiBoxHead(net, data_layer='data', from_layers=mbox_source_layers,
         use_batchnorm=use_batchnorm, min_sizes=min_sizes, max_sizes=max_sizes,
@@ -491,7 +440,7 @@ Inception_v2_Res_Conv3x3_basic_l2_SSD(net, from_layer='data',global_pool=False) 
 
 #[LYW]
 #AddExtraLayers(net, use_batchnorm)
-AddExtraLayersToResNet( net, use_batchnorm)
+AddExtraLayers( net, use_batchnorm)
 
 mbox_layers = CreateMultiBoxHead(net, data_layer='data', from_layers=mbox_source_layers,
         use_batchnorm=use_batchnorm, min_sizes=min_sizes, max_sizes=max_sizes,

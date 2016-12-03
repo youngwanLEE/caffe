@@ -1281,7 +1281,40 @@ def ResNet19_Conv3x3_basic_l4_Cifar10(net, from_layer, global_pool=True):
     net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
 
     return net
+## for CIFAR-10 by LYW : ResNet 15 Layers with only bottleneck conv 3x3 in 14th_Oct_2016
+def ResNet15_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
+    
 
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32-->32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    ResBasic33Body(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) # 16
+
+    from_layer = 'res3b'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16-->8
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4c_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+    
 def ResNet_15_Conv3x3_basic_l4_Cifar10(net, from_layer, global_pool=True):
     
 
@@ -1308,6 +1341,43 @@ def ResNet_15_Conv3x3_basic_l4_Cifar10(net, from_layer, global_pool=True):
     #ResBasic33Body(net, 'res3b', '3c', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
 
     from_layer = 'res3b'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38 --> 19 : stride = 2    
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.19.
+def ResNet_15_Conv3x3_basic_l4_v2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300 --> 150
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+    #net.pool1 = L.Pooling(net.conv1, pool=P.Pooling.MAX, kernel_size=2, stride=2) # 150 --> 75 : in July 5th 2016 by LYW
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 75
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2b', '3a', out2a=512, out2b=512,  stride=2, use_branch1=True) # 75 --> 38
+    ResBasic33Body(net, 'res3a', '3b', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    ResBasic33Body(net, 'res3b', '3c', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+
+    from_layer = 'res3c'
     ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38 --> 19 : stride = 2    
     ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
     #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
@@ -1805,15 +1875,12 @@ def BNReLUConvLayer(net, from_layer, out_layer, use_bn, use_relu, num_output,
   from_layer = relu_name
   conv_name = '{}{}{}'.format(conv_prefix, out_layer, conv_postfix)
   
-#  if kernel_h == kernel_w:
   net[conv_name] = L.Convolution(net[relu_name], num_output=num_output,
         kernel_size=kernel_h, pad=pad_h, stride=stride_h, **kwargs)
-  # else:
-  #   net[conv_name] = L.Convolution(net[relu_name], num_output=num_output,
-  #       kernel_h=kernel_h, kernel_w=kernel_w, pad_h=pad_h, pad_w=pad_w,
-  #       stride_h=stride_h, stride_w=stride_w, **kwargs)
-  # if dilation > 1:
-  #   net.update(conv_name, {'dilation': dilation})
+
+  if dilation > 1:
+    net.update(conv_name, {'dilation': dilation})
+
 
 
 ## by youngwan in 2016.09.20.
@@ -1858,6 +1925,80 @@ def ResPreActivBody(net, from_layer, block_name, out2a, out2b, stride, use_branc
   res_name = 'res{}'.format(block_name)
   net[res_name] = L.Eltwise(net[branch1], net[branch2]) #layer saved!
 
+
+## by youngwan in 2016.10.17.
+def ResPreActivBody2(net, from_layer, block_name, out2a, out2b, stride, use_branch1):
+  # ResBody(net, 'pool1', '2a', 64, 64, 256, 1, True)
+
+  conv_prefix = 'conv{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  kwargs = {
+      'param': [dict(lr_mult=1, decay_mult=1)],
+      'weight_filler': dict(type='xavier', std=0.01),
+      'bias_term': False,
+      }
+  bn_kwargs = {
+      'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+      'eps': 0.001,
+  }
+    # parameters for scale bias layer after batchnorm.
+  sb_kwargs = {
+      'bias_term': True,
+      'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+      'filler': dict(type='constant', value=1.0),
+      'bias_filler': dict(type='constant', value=0.0),
+  }
+  if use_branch1:
+    branch_name = 'proj'
+    stem_name = 'branch2a'
+  
+    bn_name = '{}root{}'.format(bn_prefix,  bn_postfix)
+    sb_name = '{}root{}'.format(scale_prefix,  scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+    from_layer = relu_name
+
+    main_conv_name = '{}{}{}'.format(conv_prefix, stem_name, conv_postfix)
+    proj_conv_name = '{}{}{}'.format(conv_prefix, branch_name,conv_postfix)
+
+    net[main_conv_name] = L.Convolution(net[relu_name], num_output=out2a,
+        kernel_size=3, pad=1, stride=stride, **kwargs)
+    out_name = main_conv_name
+    net[proj_conv_name] = L.Convolution(net[relu_name], num_output=out2b,
+        kernel_size=1, pad=0, stride=stride, **kwargs)
+    branch1 = proj_conv_name
+
+  else:
+      branch1 = from_layer
+
+      branch_name = 'branch2a'
+      BNReLUConvLayer(net, from_layer, branch_name, use_bn=True, use_relu=True,
+          num_output=out2a, kernel_size=3, pad=1, stride=stride, use_scale=use_scale,
+          conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+          bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+          scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+      out_name = '{}{}'.format(conv_prefix, branch_name)
+
+  branch_name = 'branch2b'
+  BNReLUConvLayer(net, out_name, branch_name, use_bn=True, use_relu=True,
+      num_output=out2b, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, branch_name)
+
+  res_name = 'res{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[branch2]) #layer saved!
 
 ## by youngwan in 2016.09.20.
 def PreActiv_ResNet_15_Conv3x3_basic_l4(net, from_layer, global_pool=True):
@@ -2037,6 +2178,170 @@ def PreActiv_ResNet_15_Conv3x3_basic_l3_SSD(net, from_layer, global_pool=True):
       net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
 
     return net
+
+
+## For Wide-Residual by youngwan in 2016.10.15.
+def WRN_16_8_cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs) 
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=128, out2b=128, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=128, out2b=128, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 16
+    ResPreActivBody2(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) 
+
+    ResPreActivBody2(net, 'res3b', '4a', out2a=512, out2b=512, stride=2, use_branch1=True) # 8
+    ResPreActivBody2(net, 'res4a', '4b', out2a=512, out2b=512,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## For Wide-Residual by youngwan in 2016.10.26.
+def WRN_16_4_cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs) 
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 16
+    ResPreActivBody2(net, 'res3a', '3b', out2a=128, out2b=128,  stride=1, use_branch1=False) 
+
+    ResPreActivBody2(net, 'res3b', '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 8
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## For Wide-Residual by youngwan in 2016.11. 01.
+def WRN_16_4_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='xavier', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs) #300-->15
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 150-->75
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 75-->38
+    ResPreActivBody2(net, 'res3a', '3b', out2a=128, out2b=128,  stride=1, use_branch1=False) 
+
+    ResPreActivBody2(net, 'res3b', '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38-->19
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
 
 ## by youngwan in 2016.09.21.
 
@@ -2385,13 +2690,6 @@ def Inception_v2_ResBody(net, from_layer, block_name, out2a,out2b_3,out2c_3,out_
   branch2 = '{}{}'.format(conv_prefix, root_name)
 
   branch_name = 'branch2b'
-  # out_name = '{}_1x1'.format(branch_name)
-  # ConvBNLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
-  #     num_output=out2b_1, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
-  #     conv_prefix=conv_prefix, conv_postfix=conv_postfix,
-  #     bn_prefix=bn_prefix, bn_postfix=bn_postfix,
-  #     scale_prefix=scale_prefix, scale_postfix=scale_postfix)
-
   prev_layer = '{}{}'.format(conv_prefix, root_name)
   out_name = '{}_3x3'.format(branch_name)
   
@@ -2406,14 +2704,6 @@ def Inception_v2_ResBody(net, from_layer, block_name, out2a,out2b_3,out2c_3,out_
 
 
   branch_name = 'branch2c'
-  # out_name = '{}_1x1'.format(branch_name)
-  # 
-  # ConvBNLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
-  #     num_output=out2c_1, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
-  #     conv_prefix=conv_prefix, conv_postfix=conv_postfix,
-  #     bn_prefix=bn_prefix, bn_postfix=bn_postfix,
-  #     scale_prefix=scale_prefix, scale_postfix=scale_postfix)
-
   from_layer = '{}{}'.format(conv_prefix, root_name)
   out_name = '{}_3x3_a'.format(branch_name)
 
@@ -2462,6 +2752,709 @@ def Inception_v2_ResBody(net, from_layer, block_name, out2a,out2b_3,out2c_3,out_
   relu_name = '{}_relu'.format(res_name)
   net[relu_name] = L.ReLU(net[res_name], in_place=True)
 
+## by youngwan in 2016.11.02
+def Inception_PreActResBody(net, from_layer, block_name, out2a,out2b_1,out2b_3,out2c_1, out2c_3,out_merge, stride, use_branch1):
+
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    BNReLUConvLayer(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out_merge, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch2a'
+  out_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, out_name)
+
+  branch_name = 'branch2b'
+  out_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2b_1, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  prev_layer = '{}{}'.format(conv_prefix, out_name)
+  out_name = '{}_3x3'.format(branch_name)
+  
+  BNReLUConvLayer(net, prev_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2b_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch3 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  branch_name = 'branch2c'
+  out_name = '{}_1x1'.format(branch_name)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_1, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  from_layer = '{}{}'.format(conv_prefix, out_name)
+  out_name = '{}_3x3_a'.format(branch_name)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  from_layer = '{}{}'.format(conv_prefix, out_name)
+  out_name = '{}_3x3_b'.format(branch_name)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch4 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  merge_layers=[]
+  merge_layers.append(net[branch2])
+  merge_layers.append(net[branch3])
+  merge_layers.append(net[branch4])
+
+  out_layer = '{}/concat'.format(block_name)
+  net[out_layer] = L.Concat(*merge_layers, axis=1)
+
+  from_layer = out_layer
+  out_name = '{}_1x1'.format(out_layer)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out_merge, kernel_size=1, pad=0, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  merge_branch = '{}{}'.format(conv_prefix, out_name)
+
+
+
+
+
+  res_name = 'inception_{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[merge_branch]) #layer saved!
+
+
+## by youngwan in 2016.10.13.
+def Inception_v2_PreActResBody(net, from_layer, block_name, out2a,out2b_3,out2c_3,out_merge, stride, use_branch1):
+
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    BNReLUConvLayer(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out_merge, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch_root'
+  root_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, root_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, root_name)
+
+  branch_name = 'branch2b'
+  prev_layer = '{}{}'.format(conv_prefix, root_name)
+  out_name = '{}_3x3'.format(branch_name)
+  
+  BNReLUConvLayer(net, prev_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2b_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch3 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  branch_name = 'branch2c'
+  from_layer = '{}{}'.format(conv_prefix, root_name)
+  out_name = '{}_3x3_a'.format(branch_name)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  from_layer = '{}{}'.format(conv_prefix, out_name)
+  out_name = '{}_3x3_b'.format(branch_name)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch4 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  merge_layers=[]
+  merge_layers.append(net[branch2])
+  merge_layers.append(net[branch3])
+  merge_layers.append(net[branch4])
+
+  out_layer = '{}/concat'.format(block_name)
+  net[out_layer] = L.Concat(*merge_layers, axis=1)
+
+  from_layer = out_layer
+  out_name = '{}_1x1'.format(out_layer)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out_merge, kernel_size=1, pad=0, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  merge_branch = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  res_name = 'inception_{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[merge_branch]) #layer saved!
+
+
+## by youngwan in 2016.11.24.
+def Inception_v2_PreActResBody_2nd(net, from_layer, block_name, out2a,out2b_3,out2c_3_a,out2c_3_b,out_merge, stride, use_branch1):
+
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    BNReLUConvLayer(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out_merge, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch_root'
+  root_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, root_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, root_name)
+
+  branch_name = 'branch2b'
+  prev_layer = '{}{}'.format(conv_prefix, root_name)
+  out_name = '{}_3x3'.format(branch_name)
+  
+  BNReLUConvLayer(net, prev_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2b_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch3 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  branch_name = 'branch2c'
+  from_layer = '{}{}'.format(conv_prefix, root_name)
+  out_name = '{}_3x3_a'.format(branch_name)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3_a, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  from_layer = '{}{}'.format(conv_prefix, out_name)
+  out_name = '{}_3x3_b'.format(branch_name)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3_b, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch4 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  merge_layers=[]
+  merge_layers.append(net[branch2])
+  merge_layers.append(net[branch3])
+  merge_layers.append(net[branch4])
+
+  out_layer = '{}/concat'.format(block_name)
+  net[out_layer] = L.Concat(*merge_layers, axis=1)
+
+  from_layer = out_layer
+  out_name = '{}_1x1'.format(out_layer)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out_merge, kernel_size=1, pad=0, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  merge_branch = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  res_name = 'inception_{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[merge_branch]) #layer saved!
+
+
+## by youngwan in 2016.10.21.
+def Inception_v3_PreActResBody(net, from_layer, block_name, out2a,out2b_3,out2c_3,out_merge, stride, use_branch1):
+
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    BNReLUConvLayer(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out_merge, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch2'
+  root_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, root_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, root_name)
+
+
+
+
+  branch_name = 'branch3'
+  root_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, root_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  #branch3 = '{}{}'.format(conv_prefix, root_name)
+
+
+  branch_name = 'branch3b'
+  prev_layer = '{}{}'.format(conv_prefix, root_name)
+  out_name = '{}_3x3'.format(branch_name)
+  
+  BNReLUConvLayer(net, prev_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2b_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch3 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  branch_name = 'branch3c'
+  out_name = '{}_3x3_a'.format(branch_name)
+
+  BNReLUConvLayer(net, prev_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  from_layer = '{}{}'.format(conv_prefix, out_name)
+  out_name = '{}_3x3_b'.format(branch_name)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch4 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  merge_layers=[]
+  merge_layers.append(net[branch2])
+  merge_layers.append(net[branch3])
+  merge_layers.append(net[branch4])
+
+  out_layer = '{}/concat'.format(block_name)
+  net[out_layer] = L.Concat(*merge_layers, axis=1)
+
+  from_layer = out_layer
+  out_name = '{}_1x1'.format(out_layer)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out_merge, kernel_size=1, pad=0, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  merge_branch = '{}{}'.format(conv_prefix, out_name)
+
+
+  res_name = 'inception_{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[merge_branch]) #layer saved!
+
+## by youngwan in 2016.11. 22.
+## 5x5 conv (3x3 - 3x3 conv) --> 3x3(dilation-1) Dilated conv
+def Inception_v3_dilated_PreActResBody(net, from_layer, block_name, out2a,out2b_3,out2c_3,out_merge, stride, use_branch1):
+
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    BNReLUConvLayer(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out_merge, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch2'
+  root_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, root_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, root_name)
+
+
+
+
+  branch_name = 'branch3'
+  root_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, root_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  #branch3 = '{}{}'.format(conv_prefix, root_name)
+
+
+  branch_name = 'branch3b'
+  prev_layer = '{}{}'.format(conv_prefix, root_name)
+  out_name = '{}_3x3'.format(branch_name)
+  
+  BNReLUConvLayer(net, prev_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2b_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch3 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  branch_name = 'branch3c'
+  out_name = '{}_3x3_a'.format(branch_name)
+
+  BNReLUConvLayer(net, prev_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=3, pad=2, stride=1, dilation = 2,
+      use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch4 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  merge_layers=[]
+  merge_layers.append(net[branch2])
+  merge_layers.append(net[branch3])
+  merge_layers.append(net[branch4])
+
+  out_layer = '{}/concat'.format(block_name)
+  net[out_layer] = L.Concat(*merge_layers, axis=1)
+
+  from_layer = out_layer
+  out_name = '{}_1x1'.format(out_layer)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out_merge, kernel_size=1, pad=0, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  merge_branch = '{}{}'.format(conv_prefix, out_name)
+
+
+  res_name = 'inception_{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[merge_branch]) #layer saved!
+
+## by youngwan in 2016.11.16.
+def Inception_v3_PreActResBody_2nd(net, from_layer, block_name, out2a,out2b_1,out2b_3,out2c_3_a,out2c_3_b,out_merge, stride, use_branch1):
+
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    BNReLUConvLayer(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out_merge, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch2'
+  root_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, root_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, root_name)
+
+
+
+
+  branch_name = 'branch3'
+  root_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, root_name, use_bn=True, use_relu=True,
+      num_output=out2b_1, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  #branch3 = '{}{}'.format(conv_prefix, root_name)
+
+
+  branch_name = 'branch3b'
+  prev_layer = '{}{}'.format(conv_prefix, root_name)
+  out_name = '{}_3x3'.format(branch_name)
+  
+  BNReLUConvLayer(net, prev_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2b_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch3 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  branch_name = 'branch3c'
+  out_name = '{}_3x3_a'.format(branch_name)
+
+  BNReLUConvLayer(net, prev_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3_a, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  from_layer = '{}{}'.format(conv_prefix, out_name)
+  out_name = '{}_3x3_b'.format(branch_name)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3_b, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch4 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  merge_layers=[]
+  merge_layers.append(net[branch2])
+  merge_layers.append(net[branch3])
+  merge_layers.append(net[branch4])
+
+  out_layer = '{}/concat'.format(block_name)
+  net[out_layer] = L.Concat(*merge_layers, axis=1)
+
+  from_layer = out_layer
+  out_name = '{}_1x1'.format(out_layer)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out_merge, kernel_size=1, pad=0, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  merge_branch = '{}{}'.format(conv_prefix, out_name)
+
+
+  res_name = 'inception_{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[merge_branch]) #layer saved!
+
+
+## by youngwan in 2016.10.22.
+def Inception_v4_PreActResBody(net, from_layer, block_name, out2a,out2b_3,out2c_3,out_merge, stride, use_branch1):
+
+  conv_prefix = 'res{}_'.format(block_name)
+  conv_postfix = ''
+  bn_prefix = 'bn{}_'.format(block_name)
+  bn_postfix = ''
+  scale_prefix = 'scale{}_'.format(block_name)
+  scale_postfix = ''
+  use_scale = True
+
+  if use_branch1:
+    branch_name = 'branch1'
+    BNReLUConvLayer(net, from_layer, branch_name, use_bn=True, use_relu=False,
+        num_output=out_merge, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+        conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+        scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+    branch1 = '{}{}'.format(conv_prefix, branch_name)
+  else:
+    branch1 = from_layer
+
+  branch_name = 'branch2'
+  root_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, root_name, use_bn=True, use_relu=True,
+      num_output=out_merge, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  branch2 = '{}{}'.format(conv_prefix, root_name)
+
+
+
+
+  branch_name = 'branch3'
+  root_name = '{}_1x1'.format(branch_name)
+  BNReLUConvLayer(net, from_layer, root_name, use_bn=True, use_relu=True,
+      num_output=out2a, kernel_size=1, pad=0, stride=stride, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+  #branch3 = '{}{}'.format(conv_prefix, root_name)
+
+
+  branch_name = 'branch3b'
+  root_layer = '{}{}'.format(conv_prefix, root_name)
+  out_name = '{}_3x3'.format(branch_name)
+  
+  BNReLUConvLayer(net, root_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2b_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  branch3 = '{}{}'.format(conv_prefix, out_name)
+
+
+
+  branch_name = 'branch3c'
+  out_name = '{}_3x3_a'.format(branch_name)
+
+  BNReLUConvLayer(net, root_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  previous_layer = '{}{}'.format(conv_prefix, out_name)
+  out_name = '{}_3x3_b'.format(branch_name)
+
+  BNReLUConvLayer(net, previous_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out2c_3, kernel_size=3, pad=1, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  out_name2 = '{}{}'.format(conv_prefix, out_name)
+  branch4 = 'Identity_{}'.format(branch_name)
+  net[branch4] = L.Eltwise(net[root_layer], net[out_name2]) #layer saved!
+
+
+
+  merge_layers=[]
+  merge_layers.append(net[branch2])
+  merge_layers.append(net[branch3])
+  merge_layers.append(net[branch4])
+
+  out_layer = '{}/concat'.format(block_name)
+  net[out_layer] = L.Concat(*merge_layers, axis=1)
+
+  from_layer = out_layer
+  out_name = '{}_1x1'.format(out_layer)
+
+  BNReLUConvLayer(net, from_layer, out_name, use_bn=True, use_relu=True,
+      num_output=out_merge, kernel_size=1, pad=0, stride=1, use_scale=use_scale,
+      conv_prefix=conv_prefix, conv_postfix=conv_postfix,
+      bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix)
+
+  merge_branch = '{}{}'.format(conv_prefix, out_name)
+
+
+  res_name = 'inception_{}'.format(block_name)
+  net[res_name] = L.Eltwise(net[branch1], net[merge_branch]) #layer saved!
 
 
 ## by youngwan in 2016.09.29.
@@ -2502,6 +3495,45 @@ def Inception_Res_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
 
     return net
 
+## by youngwan in 2016.10.14.
+def Inception_Res_klm_2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 30 --> 30
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=128, out2b=128, stride=1, use_branch1=True) # 75
+    ResBasic33Body(net, 'res2a', '2b', out2a=128, out2b=128, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=128, out2b=128, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 7
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=128, out2b_1=128,out2b_3=256,out2c_1=128,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=512, out2b=512, stride=2, use_branch1=True) # 38 --> 19 : stride = 2    
+    ResBasic33Body(net, 'res4a', '4b', out2a=512, out2b=512,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
 ## by youngwan in 2016.09.29.
 def Inception_Res_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
     
@@ -2524,6 +3556,160 @@ def Inception_Res_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
     ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
 
     ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.09.29.
+def Inception_Res_Conv3x3_basic_l2_m3L_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4c_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.09.29.
+def Inception_Res_Conv3x3_basic_l2_l3L_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    ResBasic33Body(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3b','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.09.29.
+def Inception_Res_Conv3x3_basic_k2_l2_l3L_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=128, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=128, out2b=64, stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    ResBasic33Body(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3b','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.10.11.
+def Inception_Res_Conv3x3_basic_14L_l2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 32 --> 32
+        num_output=64, kernel_size=3, pad=1, stride=1,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=False) # 32
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
     #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
     Inception_ResBody(net,'res3a','3a',out2a=64, out2b_1=64,out2b_3=256,out2c_1=64,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
     
@@ -2578,6 +3764,2399 @@ def Inception_v2_Res_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True)
 
     return net
 
+
+## by youngwan in 2016.11.02.
+def Inception_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_PreActResBody(net,'res3a','3a',out2a=128, out2b_1=128,out2b_3=128,out2c_1=128,out2c_3=128,out_merge=128,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.11.02.
+def Inception_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_PreActResBody(net,'res3a','3a',out2a=128, out2b_1=128,out2b_3=128,out2c_1=128,out2c_3=128,out_merge=128,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.17.
+def Inception_v2_PreActRes_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.11. 02.
+def Inception_v2_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody(net,'res3a','3a',out2a=128, out2b_3=128,out2c_3=128,out_merge=128,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.11. 24.
+def Inception_v2_7_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody_2nd(net,'res3a','3a',out2a=128, out2b_3=64,out2c_3_a=64,out2c_3_b=128,out_merge=128,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.11. 02.
+def Inception_v2_7_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody_2nd(net,'res3a','3a',out2a=128, out2b_3=64,out2c_3_a=64,out2c_3_b=128,out_merge=128,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.11. 24.
+def Inception_v2_7_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody_2nd(net,'res3a','3a',out2a=128, out2b_3=64,out2c_3_a=64,out2c_3_b=128,out_merge=128,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.11. 28.
+def Inception_v2_8_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody_2nd(net,'res3a','3a',out2a=256, out2b_3=256,out2c_3_a=128,out2c_3_b=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.11. 28.
+def Inception_v2_8_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody_2nd(net,'res3a','3a',out2a=256, out2b_3=256,out2c_3_a=128,out2c_3_b=256,out_merge=256,stride=1,use_branch1=False)
+    
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.11. 02.
+def Inception_v2_6_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody_2nd(net,'res3a','3a',out2a=128, out2b_3=64,out2c_3_a=64,out2c_3_b=128,out_merge=128,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+#    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    Inception_v2_PreActResBody_2nd(net,'res4a','4b',out2a=256, out2b_3=128,out2c_3_a=128,out2c_3_b=256,out_merge=256,stride=1,use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.11. 25.
+def Inception_v2_5_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody_2nd(net,'res3a','3a',out2a=256, out2b_3=128,out2c_3_a=128,out2c_3_b=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.11. 25.
+def Inception_v2_5_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody_2nd(net,'res3a','3a',out2a=256, out2b_3=128,out2c_3_a=128,out2c_3_b=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.10.27.
+def Inception_v2_PreActRes_Conv3x3_basic_l2_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2c', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.27.
+def Inception_v2_2_PreActRes_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=256,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.30.
+def Inception_v2_3_PreActRes_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.30.
+def Inception_v2_3_PreActRes_Conv3x3_basic_l2_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=2, **kwargs) # 300 --> 150
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 150 --> 75
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 75 --> 38
+    Inception_v2_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=256,stride=1,use_branch1=False) #38
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38 --> 19   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.30.
+def Inception_v2_4_PreActRes_Conv3x3_basic_l2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.30.
+def Inception_v2_4_PreActRes_Conv3x3_basic_l2_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.27.
+def Inception_v2_2_PreActRes_Conv3x3_basic_l2_SSD(net, from_layer, global_pool=True, freeze_layers=[]):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v2_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=256,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    # Update freeze layers.
+    kwargs['param'] = [dict(lr_mult=0, decay_mult=0)]
+    layers = net.keys()
+    for freeze_layer in freeze_layers:
+        if freeze_layer in layers:
+            net.update(freeze_layer, kwargs)
+
+
+    return net
+
+## by youngwan in 2016.10.17.
+def Inception_v2_PreActRes_Conv3x3_basic_l2_v2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    ResPreActivBody2(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) # 32-->16
+    Inception_v2_PreActResBody(net,'res3b','3a',out2a=64, out2b_3=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.18.
+def Inception_v2_PreActRes_Conv3x3_basic_l2_v2_Cifar100(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    ResPreActivBody2(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) # 32-->16
+    Inception_v2_PreActResBody(net,'res3b','3a',out2a=64, out2b_3=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc100 = L.InnerProduct(net.pool5, num_output=100, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.17.
+def Inception_v2_PreActRes_Conv3x3_basic_l2_v2_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    ResPreActivBody2(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) # 32-->16
+    Inception_v2_PreActResBody(net,'res3b','3a',out2a=64, out2b_3=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=True, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.17.
+def Inception_v2_PreActRes_Conv3x3_basic_l2_m2_v2_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    #ResPreActivBody2(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    ResPreActivBody2(net, 'res3a', '3b', out2a=256, out2b=256,  stride=1, use_branch1=False) # 32-->16
+    Inception_v2_PreActResBody(net,'res3b','3a',out2a=64, out2b_3=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=512, out2b=512, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=512, out2b=512,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.10.21.
+def Inception_v3_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody_2nd(net,'res3a','3a',out2a=128,	out2b_1=64,	out2b_3=128,out2c_3_a=128,out2c_3_b=64,out_merge=128,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.21.
+def Inception_v3_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 150 --> 75
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 75-->38
+    Inception_v3_PreActResBody_2nd(net,'res3a','3a',out2a=128,	out2b_1=64,	out2b_3=128,out2c_3_a=128,out2c_3_b=64,out_merge=128,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38-->19
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.26.
+def Inception_v3_2_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=128,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.26.
+def Inception_v3_2_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=128,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.29.
+def Inception_v3_3_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.26.
+def Inception_v3_3_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.11.04.
+def Inception_v3_4_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=192, out2b=192,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=192,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.11.21.
+def Inception_v3_4_PreActRes_Conv3x3_basic_Cifar100(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=192, out2b=192,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=192,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc100 = L.InnerProduct(net.pool5, num_output=100, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.11.04.
+def Inception_v3_4_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True,freeze_layers=[]):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=192, out2b=192,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=192,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+
+    # Update freeze layers.
+    kwargs['param'] = [dict(lr_mult=0, decay_mult=0)]
+    layers = net.keys()
+    for freeze_layer in freeze_layers:
+        if freeze_layer in layers:
+            net.update(freeze_layer, kwargs)
+
+
+    return net
+
+## by youngwan in 2016.11.08.
+def Inception_v3_5_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=256,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.11.08.
+def Inception_v3_5_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=256,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.11.08.
+def Inception_v3_6_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=256,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.11.08.
+def Inception_v3_6_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='xavier', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=256,out2c_3=128,out_merge=256,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.11.22.
+def Inception_v3_6_Dilated_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_dilated_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.11.22.
+def Inception_v3_6_Dilated_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='xavier', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=64,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v3_dilated_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.22.
+def Inception_v4_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v4_PreActResBody(net,'res3a','3a',out2a=128, out2b_3=128,out2c_3=128,out_merge=128,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.22.
+def Inception_v4_2_PreActRes_Conv3x3_basic_Cifar10(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=1, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=1, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v4_PreActResBody(net,'res3a','3a',out2a=64, out2b_3=128,out2c_3=128,out_merge=128,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+
+    net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.10.22.
+def Inception_v4_PreActRes_Conv3x3_basic_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=3, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=128, out2b=128,  stride=2, use_branch1=True) # 32-->16
+    Inception_v4_PreActResBody(net,'res3a','3a',out2a=128, out2b_3=128,out2c_3=128,out_merge=128,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.22.
+def Inception_v4_PreActRes_Conv3x3_basic_ImageNet(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    kwargs = {
+        'param': [dict(lr_mult=1, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    bn_kwargs = {
+        'param': [dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0), dict(lr_mult=0, decay_mult=0)],
+        'eps': 0.001,
+    }
+      # parameters for scale bias layer after batchnorm.
+    sb_kwargs = {
+        'bias_term': True,
+        'param': [dict(lr_mult=1, decay_mult=0), dict(lr_mult=1, decay_mult=0)],
+        'filler': dict(type='constant', value=1.0),
+        'bias_filler': dict(type='constant', value=0.0),
+    }
+    net['conv_1'] = L.Convolution(net[from_layer], num_output=16,
+      kernel_size=64, pad=1, stride=2, **kwargs)
+
+    from_layer = 'conv_1'
+    ResPreActivBody2(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 32
+    ResPreActivBody2(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResPreActivBody2(net, 'res2b', '3a', out2a=256, out2b=256,  stride=2, use_branch1=True) # 32-->16
+    Inception_v4_PreActResBody(net,'res3a','3a',out2a=128, out2b_3=256,out2c_3=256,out_merge=256,stride=1,use_branch1=False)
+    
+    from_layer = 'inception_3a'
+    ResPreActivBody2(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 16 --> 8   
+    ResPreActivBody2(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+
+    from_layer = 'res4b'
+    bn_name = '{}{}{}'.format(bn_prefix, from_layer, bn_postfix)
+    sb_name = '{}{}{}'.format(scale_prefix, from_layer, scale_postfix)
+    relu_name = '{}_relu'.format(bn_name)
+
+    net[bn_name] = L.BatchNorm(net[from_layer], in_place=False, **bn_kwargs)
+    net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+    net[relu_name] = L.ReLU(net[sb_name], in_place=True)
+
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net[relu_name], pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
 ## by youngwan in 2016.10.10.
 def Inception_v2_Res_Conv3x3_basic_l2_SSD(net, from_layer, global_pool=True):
     
@@ -2611,7 +6190,7 @@ def Inception_v2_Res_Conv3x3_basic_l2_SSD(net, from_layer, global_pool=True):
       
     if global_pool:
       net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
-      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+      net.fc1000 = L.InnerProduct(net.pool5, num_output=1000, weight_filler=dict(type='xavier'))
 
     return net
 
@@ -2886,6 +6465,43 @@ def Inception_Res_Conv3x3_basic_l4_Cifar10(net, from_layer, global_pool=True):
       net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
 
     net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+## by youngwan in 2016.10.14.
+def Inception_Res_Conv3x3_basic_l4_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 300-->150
+        num_output=64, kernel_size=3, pad=1, stride=2,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 150-->75
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=512, out2b=512,  stride=2, use_branch1=True) # 75-->38
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 38
+    Inception_ResBody(net,'res3a','3a',out2a=256, out2b_1=256,out2b_3=512,out2c_1=256,out2c_3=512,out_merge=512,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) # 38-->19   
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
 
     return net
 
@@ -3196,6 +6812,44 @@ def Inception_Res_Conv3x3_basic_l3_Cifar10(net, from_layer, global_pool=True):
       net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
 
     net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
+
+    return net
+
+
+## by youngwan in 2016.10.15.
+def Inception_Res_Conv3x3_basic_l3_SSD(net, from_layer, global_pool=True):
+    
+
+    bn_prefix = 'bn_'
+    bn_postfix = ''
+    scale_prefix = 'scale_'
+    scale_postfix = ''
+
+    ConvBNLayer(net, from_layer, 'conv1', use_bn=True, use_relu=True, # 
+        num_output=64, kernel_size=3, pad=1, stride=2,
+        bn_prefix=bn_prefix, bn_postfix=bn_postfix,
+      scale_prefix=scale_prefix, scale_postfix=scale_postfix
+    )
+
+
+    from_layer = 'conv1_relu'
+    ResBasic33Body(net, from_layer, '2a', out2a=64, out2b=64, stride=2, use_branch1=True) # 
+    ResBasic33Body(net, 'res2a', '2b', out2a=64, out2b=64, stride=1, use_branch1=False)
+    ResBasic33Body(net, 'res2b', '2c', out2a=64, out2b=64, stride=1, use_branch1=False)
+
+    ResBasic33Body(net, 'res2c', '3a', out2a=384, out2b=384,  stride=2, use_branch1=True) # 
+    #ResBasic33Body(net, 'res3a', '3a', out2a=512, out2b=512,  stride=1, use_branch1=False) # 
+    Inception_ResBody(net,'res3a','3a',out2a=192, out2b_1=192,out2b_3=384,out2c_1=192,out2c_3=384,out_merge=384,stride=1,use_branch1=False)
+    
+
+    from_layer = 'inception_3a'
+    ResBasic33Body(net, from_layer, '4a', out2a=256, out2b=256, stride=2, use_branch1=True) #  
+    ResBasic33Body(net, 'res4a', '4b', out2a=256, out2b=256,  stride=1, use_branch1=False)
+    #ResBasic33Body(net, 'res4b', '4c', out2a=256, out2b=256,  stride=1, use_branch1=False)
+      
+    if global_pool:
+      net.pool5 = L.Pooling(net.res4b_relu, pool=P.Pooling.AVE, global_pooling=True)
+      net.fc10 = L.InnerProduct(net.pool5, num_output=10, weight_filler=dict(type='xavier'))
 
     return net
 

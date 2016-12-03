@@ -1,0 +1,4 @@
+
+python examples/kitti_ssd/Inception/inception_v4/ssd_kitti_inception_v4_300x3x00_origin_ASP.py
+
+python examples/kitti_ssd/Inception/inception_v4/ssd_kitti_inception_v4_300x300_origin_ASP_BN.py

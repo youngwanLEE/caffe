@@ -189,7 +189,7 @@ batch_sampler = [
         ]
 train_transform_param = {
         'mirror': True,
-        'mean_value': [104, 117, 123],
+        'mean_value': [96, 99, 94],
         'resize_param': {
                 'prob': 1,
                 'resize_mode': P.Resize.WARP,
@@ -208,7 +208,7 @@ train_transform_param = {
             }
         }
 test_transform_param = {
-        'mean_value': [104, 117, 123],
+        'mean_value': [96, 99, 94],
         'resize_param': {
                 'prob': 1,
                 'resize_mode': P.Resize.WARP,
@@ -322,7 +322,7 @@ for ratio in xrange(min_ratio, max_ratio + 1, step):
   max_sizes.append(min_dim * (ratio + step) / 100.)
 min_sizes = [min_dim * 10 / 100.] + min_sizes
 max_sizes = [[]] + max_sizes
-aspect_ratios = [[2,4], [2, 3, 4], [2, 3, 4], [2, 3, 4], [2, 3, 4], [2, 3]]
+aspect_ratios = [[2,3,4], [2, 3, 4], [2, 3, 4], [2, 3, 4], [2, 3, 4], [2, 3]]
 # L2 normalize conv4_3.
 normalizations = [20, 20, -1, -1, -1, -1]
 # variance used to encode/decode prior bboxes.
