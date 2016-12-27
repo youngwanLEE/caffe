@@ -36,6 +36,11 @@ void AnnotatedDataLayer<Dtype>::DataLayerSetUp(
   }
   label_map_file_ = anno_data_param.label_map_file();
 
+  // hekim added 161227/////////////////////
+  sampling_strategy_ = anno_data_param.sampling_strategy();
+  LOG(INFO) << "Sampling STrategy: " << sampling_strategy_<<std::endl;
+  //////////////////////////////////////////
+
   // Read a data point, and use it to initialize the top blob.
   AnnotatedDatum& anno_datum = *(reader_.full().peek());
 
@@ -134,7 +139,22 @@ void AnnotatedDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
     if (batch_samplers_.size() > 0) {
       // Generate sampled bboxes from anno_datum.
       vector<NormalizedBBox> sampled_bboxes;
-      GenerateBatchSamples(anno_datum, batch_samplers_, &sampled_bboxes);
+      // hekim added 161227/////////////////////
+      //GenerateBatchSamples(anno_datum, batch_samplers_, &sampled_bboxes);
+///*
+      if (!strcasecmp(sampling_strategy_.c_str(), "RS")){
+        GenerateBatchSamples(anno_datum, batch_samplers_, &sampled_bboxes);
+        //LOG(INFO) << "Sampling STrategy (RS): " << sampling_strategy_<<std::endl;
+      }
+      else if(!strcasecmp(sampling_strategy_.c_str(), "RRS")){
+        GenerateBatchSamples_RRS(anno_datum, batch_samplers_, &sampled_bboxes);
+        //LOG(INFO) << "Sampling STrategy (RRS): " << sampling_strategy_<<std::endl;
+      }else{
+        LOG(INFO) << "Unkown sampling strategy: " << sampling_strategy_<<std::endl;
+      }
+//*/
+      ////////////////////////////////////////////
+
       if (sampled_bboxes.size() > 0) {
         // Randomly pick a sampled bbox and crop the anno_datum.
         int rand_idx = caffe_rng_rand() % sampled_bboxes.size();

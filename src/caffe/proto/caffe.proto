@@ -701,6 +701,10 @@ message AnnotatedDataParameter {
   repeated BatchSampler batch_sampler = 1;
   // Store label name and label id in LabelMap format.
   optional string label_map_file = 2;
+  
+  // 2016.12.27.LYW
+  // Define batch sampling strategy
+  optional string sampling_strategy = 3 [default = "RS"];
 }
 
 message ArgMaxParameter {
